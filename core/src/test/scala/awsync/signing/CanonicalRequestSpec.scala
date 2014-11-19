@@ -69,9 +69,8 @@ class CanonicalRequestSpec extends AwsyncSpec {
           RawHeader("host", "iam.amazonaws.com"),
           RawHeader("x-amz-date", "20110909T233600Z")
         )
-      )
-      val body = Strict(ContentTypes.`text/plain`, ByteString("Action=ListUsers&Version=2010-05-08"))
-      val result = create(request, body)
+      ).withEntity(Strict(ContentTypes.`text/plain`, ByteString("Action=ListUsers&Version=2010-05-08")))
+      val result = create(request)
 
       val expected = """
         |POST
@@ -87,6 +86,13 @@ class CanonicalRequestSpec extends AwsyncSpec {
 
       result.value should be (expected)
     }
+
+
+    it("generates the expected hash string") {
+      val result = createHash("Action=ListUsers&Version=2010-05-08")
+      result should be("b6359072c78d70ebee1e81adcbab4f01bf2c23245fa365ef83fe8f1f955085e2")
+    }
+
 
   }
 }

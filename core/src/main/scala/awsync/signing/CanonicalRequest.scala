@@ -1,22 +1,28 @@
 package awsync.signing
 
+import collection.immutable.Seq
 import akka.http.model.HttpEntity.Strict
 import akka.http.model.{HttpEntity, HttpHeader, HttpRequest, Uri}
+import akka.util.ByteString
 
 object CanonicalRequest {
 
-  def create(request: HttpRequest, body: HttpEntity): CanonicalRequest = {
+  def create(request: HttpRequest): CanonicalRequest = {
     val method = request.method.name
     val canonicalUri = encodePath(request.getUri().path())
     val canonicalQuery = encodeParameters(request.uri.query)
     val canonicalHeaders = encodeHeaders(request.headers)
     val signedHeaders = encodeSignedHeaders(request.headers)
-    val hash = bodyHash(body)
-    new CanonicalRequest(s"$method\n$canonicalUri\n$canonicalQuery\n$canonicalHeaders\n$signedHeaders\n$hash", hash)
+    val hash = bodyHash(request.entity)
+    new CanonicalRequest(
+      s"$method\n$canonicalUri\n$canonicalQuery\n$canonicalHeaders\n$signedHeaders\n$hash",
+      hash,
+      signedHeaders
+    )
   }
 
   def bodyHash(body: HttpEntity): String = body match {
-    case Strict(_, bytes) => Sha256.createHash(bytes)
+    case Strict(_, bytes) => createHash(bytes)
     case x => throw new RuntimeException(s"Unsupported body type $x")
   }
 
@@ -50,6 +56,23 @@ object CanonicalRequest {
   private def percentEncode(char: Char): String = {
     "%" + Integer.toHexString(char.toInt)
   }
+
+  import java.security.MessageDigest
+
+  // not thread safe so must be created for each calculation
+  private def sha = MessageDigest.getInstance("SHA-256")
+
+  def createHash(s: String): String = createHash(s.getBytes)
+
+  def createHash(bytes: ByteString): String = {
+    // this sucks, but, no idea of how to create hash from byte string
+    val array = new Array[Byte](bytes.length)
+    bytes.copyToArray(array, 0, bytes.length)
+    createHash(array)
+  }
+
+  def createHash(bytes: Array[Byte]): String = Utils.hexEncode(sha.digest(bytes))
+
 }
 
-class CanonicalRequest(val value: String, val hash: String)
+class CanonicalRequest(val value: String, val hash: String, val signedHeaders: String)
