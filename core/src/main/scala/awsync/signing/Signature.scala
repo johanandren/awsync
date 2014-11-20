@@ -6,8 +6,7 @@ import javax.crypto.spec.SecretKeySpec
 
 import awsync.{Service, Region, AwsSecret}
 
-object Signature {
-
+private[signing] object Signature {
 
   def create(secret: AwsSecret, date: Date, region: Region, service: Service, stringToSign: String): String = {
     val secretKey = ("AWS4" + secret.secret).getBytes("UTF-8")

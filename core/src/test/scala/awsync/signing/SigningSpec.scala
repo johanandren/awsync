@@ -1,15 +1,18 @@
 package awsync.signing
 
+import java.util.{TimeZone, Calendar, Date}
+
 import akka.http.model.HttpEntity.Strict
 import akka.http.model._
 import akka.http.model.headers.{Host, RawHeader}
 import akka.util.ByteString
+import awsync.{Credentials, Service, Regions, AbstractSpec}
 
 import scala.collection.immutable.Seq
 
-class CanonicalRequestSpec extends AwsyncSpec {
+class SigningSpec extends AbstractSpec {
 
-  describe("The canonical request") {
+  describe("The canonical request creator") {
 
     import awsync.signing.CanonicalRequest._
     it("uses / for empty path") {
@@ -93,6 +96,49 @@ class CanonicalRequestSpec extends AwsyncSpec {
       result should be("b6359072c78d70ebee1e81adcbab4f01bf2c23245fa365ef83fe8f1f955085e2")
     }
 
+  }
+
+  describe("String to sign creator") {
+
+    it("generates the expected string to sign") {
+
+      val result = StringToSign.create(
+        "20110909T233600Z",
+        Regions.USEast,
+        Service("iam"),
+        "3511de7e95d28ecd39e9513b642aee07e54f4941150d8df8bf94b328ef7e55e2")
+
+      result should be ("AWS4-HMAC-SHA256\n20110909T233600Z\n20110909/us-east-1/iam/aws4_request\n3511de7e95d28ecd39e9513b642aee07e54f4941150d8df8bf94b328ef7e55e2")
+
+    }
+  }
+
+  describe("Request signing") {
+
+    it("signs a request") {
+      val request = HttpRequest(
+        HttpMethods.POST,
+        Uri("http://iam.amazonaws.com"),
+        Seq[HttpHeader](
+          RawHeader("content-type", "application/x-www-form-urlencoded; charset=utf-8"),
+          RawHeader("host", "iam.amazonaws.com")
+        )
+      ).withEntity(Strict(ContentTypes.`text/plain`, ByteString("Action=ListUsers&Version=2010-05-08")))
+
+      val cal = Calendar.getInstance(TimeZone.getTimeZone("GMT"))
+      cal.set(2011, 8, 9, 23, 36, 0)
+      val date = cal.getTime
+
+      val result = Sign(request, Regions.USEast, Service("iam"), Credentials("key", "secret"), date)
+
+      val maybeAuth = result.getHeader("Authorization")
+      maybeAuth should be ('defined)
+      val header: String = maybeAuth.get.value
+
+      header should startWith ("AWS4-HMAC-SHA256 Credential=key/20110909/us-east-1/iam/aws4_request, SignedHeaders=content-type;host;x-amz-date, Signature=")
+
+    }
 
   }
+
 }
