@@ -1,16 +1,18 @@
-package awsync.signing
+package awsync.authentication
 
 import java.util.Date
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
 
-import awsync.{Service, Region, AwsSecret}
+import awsync.{DateUtils, Service, Region, AwsSecret}
 
-private[signing] object Signature {
+private[authentication] object Signature {
+
+  import Sha256.hmacSHA256
 
   def create(secret: AwsSecret, date: Date, region: Region, service: Service, stringToSign: String): String = {
     val secretKey = ("AWS4" + secret.secret).getBytes("UTF-8")
-    val dateStamp = DateFormats.formatDate(date)
+    val dateStamp = DateUtils.toIso8601DateFormat(date)
     val dateKey = hmacSHA256(dateStamp, secretKey)
     val regionKey = hmacSHA256(region.name, dateKey)
     val serviceKey = hmacSHA256(service.name, regionKey)
@@ -18,10 +20,5 @@ private[signing] object Signature {
     Utils.hexEncode(hmacSHA256(stringToSign, signingKey))
   }
 
-  private val algorithm = "HmacSHA256"
-  private def hmacSHA256(data: String, key: Array[Byte]): Array[Byte] = {
-    val mac = Mac.getInstance(algorithm)
-    mac.init(new SecretKeySpec(key, algorithm))
-    mac.doFinal(data.getBytes("UTF8"))
-  }
+
 }
