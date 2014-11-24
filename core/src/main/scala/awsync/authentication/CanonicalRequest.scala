@@ -3,7 +3,7 @@ package awsync.authentication
 import spray.http._
 import collection.immutable.Seq
 
-object CanonicalRequest {
+private[authentication] object CanonicalRequest {
 
   type CanonicalRequest = String
   type SignedHeaders = String

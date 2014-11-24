@@ -9,7 +9,7 @@ import spray.http.HttpData.Bytes
 import spray.http.HttpEntity
 import spray.http.HttpEntity.{Empty, NonEmpty}
 
-object Sha256 {
+private[authentication] object Sha256 {
 
   // not thread safe so must be created for each calculation
   private def sha256 = MessageDigest.getInstance("SHA-256")
