@@ -4,7 +4,8 @@ import java.util.Date
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
 
-import awsync.{DateUtils, Service, Region, AwsSecret}
+import awsync.utils.DateUtils
+import awsync.{Service, Region, AwsSecret}
 
 private[authentication] object Signature {
 

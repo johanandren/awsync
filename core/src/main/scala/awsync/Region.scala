@@ -1,5 +1,10 @@
 package awsync
 
+/**
+ * A geographic amazon location (where the services are hosted)
+ * @param location Human readable representation
+ * @param name Unique name of the region
+ */
 case class Region(location: String, name: String)
 
 object Regions {

@@ -12,11 +12,10 @@ import awsync.{Service, Region, Credentials}
 import spray.can.Http
 import spray.http._
 
-
 import scala.concurrent.Future
 import scala.xml.{Elem, XML}
 
-object ConcreteS3Client {
+private[s3] object ConcreteS3Client {
 
   def apply(credentials: Credentials, region: Region)(implicit system: ActorSystem): Future[S3Client] = {
 
@@ -34,7 +33,7 @@ object ConcreteS3Client {
 
 }
 
-final class ConcreteS3Client(credentials: Credentials, region: Region, info: Http.HostConnectorInfo, system: ActorSystem) extends S3Client {
+private[s3] final class ConcreteS3Client(credentials: Credentials, region: Region, info: Http.HostConnectorInfo, system: ActorSystem) extends S3Client {
 
   import ConcreteS3Client._
   import awsync.authentication.Authentication

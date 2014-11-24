@@ -3,7 +3,8 @@ package awsync.authentication
 import java.util.Date
 
 import awsync.http.AwsHeaders
-import awsync.{DateUtils, Credentials, Service, Region}
+import awsync.utils.DateUtils
+import awsync.{Credentials, Service, Region}
 import spray.http.HttpHeaders.RawHeader
 import spray.http.HttpRequest
 

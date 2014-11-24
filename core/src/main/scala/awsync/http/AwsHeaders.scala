@@ -1,8 +1,7 @@
 package awsync.http
 
 import java.util.Date
-
-import awsync.DateUtils
+import awsync.utils.DateUtils
 import spray.http.HttpHeader
 import spray.http.HttpHeaders.RawHeader
 

@@ -16,6 +16,9 @@ trait S3Client {
 
 object S3Client {
 
+  /**
+   * @return A thread safe/shareable client to use for communication with amzon s3
+   */
   def apply(credentials: Credentials, region: Region)(implicit system: ActorSystem): Future[S3Client] =
     ConcreteS3Client(credentials, region)(system)
 

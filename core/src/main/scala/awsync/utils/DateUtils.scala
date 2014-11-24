@@ -1,7 +1,7 @@
-package awsync
+package awsync.utils
 
 import java.text.SimpleDateFormat
-import java.util.{TimeZone, Locale, Date}
+import java.util.{Date, Locale, TimeZone}
 
 private[awsync] object DateUtils {
 
