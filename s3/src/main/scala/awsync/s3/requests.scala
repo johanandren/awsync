@@ -1,5 +1,7 @@
 package awsync.s3
 
+import java.util.Date
+
 /**
  * @param delimiter A delimiter is a character you use to group keys.
  * @param marker specifies the key to start with when listing objects in a bucket. Amazon S3 returns object
@@ -11,3 +13,9 @@ package awsync.s3
  *               same way you'd use a folder in a file system.)
  */
 case class ListObjectsConfig(delimiter: Option[String], marker: Option[String] , maxKeys: Option[Int], prefix: Option[String])
+
+
+sealed trait ETagMatch
+case class IfMatch(tag: ETag) extends ETagMatch
+case class IfNoneMatch(tag: ETag) extends ETagMatch
+case class GetObjectConfig(ifModifiedSince: Option[Date], ifUnmodifiedSince: Option[Date], etagMatch: Option[ETagMatch])

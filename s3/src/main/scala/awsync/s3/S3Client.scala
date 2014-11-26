@@ -24,10 +24,13 @@ trait S3Client {
    */
   def listObjects(bucket: BucketName, config: ListObjectsConfig): Future[(ListObjectsInfo, Seq[KeyDetails])]
 
-  /**
+  /*
    * @return None if the bucket is accessible with the current credentials, the reason why if it is not
    */
   def canAccess(bucket: BucketName): Future[Option[NoAccessReason]]
+
+  def getObjectMetadata(bucket: BucketName, key: Key): Future[S3ObjectMetadata]
+
 }
 
 object S3Client {

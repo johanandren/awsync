@@ -2,6 +2,8 @@ package awsync.s3
 
 import java.util.Date
 
+import spray.http.Uri.Query
+
 import scala.concurrent.duration._
 import scala.collection.immutable.Seq
 import akka.pattern.ask
@@ -48,7 +50,7 @@ private[s3] final class ConcreteS3Client(
   // api implementation
 
   override def listBuckets: Future[Seq[(BucketName, Date)]] =
-    sendRequest(signedRequest(GET, baseUri, ""))
+    sendRequest(signedRequest(GET, baseUri))
       .map(handleResponse(parsers.ListBuckets.parse))
 
   override def listObjects(bucket: BucketName, config: ListObjectsConfig): Future[(ListObjectsInfo, Seq[KeyDetails])] = {
@@ -59,12 +61,12 @@ private[s3] final class ConcreteS3Client(
       config.prefix.map("prefix" -> _)
     )
     val uri = bucketBaseUri(bucket).withQuery(parameters.flatten: _*)
-    sendBucketRequest(bucket, signedRequest(GET, uri, ""))
+    sendBucketRequest(bucket, signedRequest(GET, uri))
       .map(handleResponse(parsers.ListObjects.parse))
   }
 
   override def canAccess(bucket: BucketName): Future[Option[NoAccessReason]] =
-    sendBucketRequest(bucket, signedRequest(HEAD, bucketBaseUri(bucket), ""))
+    sendBucketRequest(bucket, signedRequest(HEAD, bucketBaseUri(bucket)))
       .map { response =>
         response.status match {
           case StatusCodes.OK => None
@@ -74,10 +76,19 @@ private[s3] final class ConcreteS3Client(
         }
       }
 
-
-
+  override def getObjectMetadata(bucket: BucketName, key: Key): Future[S3ObjectMetadata] = {
+    val request = signedRequest(HEAD, bucketBaseUri(bucket).withPath(path(key)))
+    println(request)
+    sendBucketRequest(bucket, request)
+      .map { response =>
+      if (response.status == StatusCodes.OK) S3ObjectMetadata(response.headers.map(h => h.name -> h.value).toMap)
+      else exceptionFor(response)
+    }
+  }
 
   // helpers
+
+  private def path(key: Key): Uri.Path = Uri.Path("/" + key.name)
 
   private def handleResponse[A](onOk: Elem => Try[A])(response: HttpResponse): A =
     if (response.status == StatusCodes.OK) onOk(XML.loadString(response.entity.asString)).get
@@ -87,7 +98,7 @@ private[s3] final class ConcreteS3Client(
     throw new RuntimeException(s"Failed request, status: ${response.status}, body: ${response.entity.asString}")
 
 
-  private def signedRequest(method: HttpMethod, uri: Uri, body: String): HttpRequest =
+  private def signedRequest(method: HttpMethod, uri: Uri): HttpRequest =
     Authentication.signWithHeader(
       HttpRequest(method, uri, List(HttpHeaders.Host(uri.authority.host.address))),
       region,
@@ -102,7 +113,8 @@ private[s3] final class ConcreteS3Client(
     bucketConnectorInfo(bucket).flatMap(_.hostConnector ? request).mapTo[HttpResponse]
 
 
-  // host connector for bucket-less requests
+  // host connectors - spray will manage a pool of instances for each host for us
+  // TODO maybe tweak the size of those pools somehow?
   private def baseConnectorInfo: Future[Http.HostConnectorInfo]  =
     (IO(Http) ? Http.HostConnectorSetup("s3.amazonaws.com", port)).mapTo[Http.HostConnectorInfo]
 
