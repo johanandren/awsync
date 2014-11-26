@@ -13,11 +13,10 @@ Preliminary
 
 ```scala
 implicit val system = ActorSystem("test")
-import system.dispatcher
 
 val creds = Credentials("aws-key", "aws-secret")
 
-val client = Await.result(S3Client(creds, Regions.USEast), 2.seconds)
+val client = S3Client(creds, Regions.USEast)
 client.listBuckets.foreach { buckets: Seq[Bucket] =>
   println("My buckets: " + buckets)
 }

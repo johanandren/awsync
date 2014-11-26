@@ -1,5 +1,24 @@
 package awsync
 
+/** account key/identifier */
+case class AwsKey(key: String)
+
+/** account secret/password */
+final class AwsSecret(val secret: String) {
+  // make sure the secret does not go in logs/printlns etc. by accident
+  override def toString = "AwsSecret(****)"
+}
+object AwsSecret {
+  def apply(secret: String): AwsSecret = new AwsSecret(secret)
+}
+
+/** the pair of key and secret used to access services */
+case class Credentials(key: AwsKey, secret: AwsSecret)
+
+object Credentials {
+  def apply(key: String, secret: String): Credentials = new Credentials(AwsKey(key), AwsSecret(secret))
+}
+
 /**
  * A geographic amazon location (where the services are hosted)
  * @param location Human readable representation
@@ -18,3 +37,8 @@ object Regions {
   val AsiaPacificNorthEast = Region("Asia Pacific (Tokyo)", "ap-northeast-1")
   val SouthAmerica = Region("South America (Sao Paulo)", "sa-east-1")
 }
+
+/**
+ * @param name Unique service name, for example "iam", "s3"
+ */
+case class Service(name: String)
