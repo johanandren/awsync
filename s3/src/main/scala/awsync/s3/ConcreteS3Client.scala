@@ -2,6 +2,8 @@ package awsync.s3
 
 import java.util.Date
 
+import awsync.s3.ETagMismatch
+import awsync.utils.DateUtils
 import spray.http.Uri.Query
 
 import scala.concurrent.duration._
@@ -76,17 +78,52 @@ private[s3] final class ConcreteS3Client(
         }
       }
 
-  override def getObjectMetadata(bucket: BucketName, key: Key): Future[S3ObjectMetadata] = {
+  override def getObjectMetadata(bucket: BucketName, key: Key): Future[Option[S3ObjectMetadata]] = {
     val request = signedRequest(HEAD, bucketBaseUri(bucket).withPath(path(key)))
-    println(request)
     sendBucketRequest(bucket, request)
       .map { response =>
-      if (response.status == StatusCodes.OK) S3ObjectMetadata(response.headers.map(h => h.name -> h.value).toMap)
-      else exceptionFor(response)
+        response.status match {
+          case StatusCodes.OK => Some(S3ObjectMetadata(response.headers.map(h => h.name -> h.value).toMap))
+          case StatusCodes.NotFound => None
+          case _ => exceptionFor(response)
+        }
+    }
+  }
+
+  override def getObject(bucket: BucketName, key: Key, range: Option[ByteRange], conditions: Option[GetObjectCondition]): Future[Either[NoObjectReason, S3Object]] = {
+    val uri = bucketBaseUri(bucket).withPath(path(key))
+    val request = HttpRequest(GET, uri,
+      List(
+        Some[HttpHeader](HttpHeaders.Host(uri.authority.host.address)),
+        range.map(HttpHeaders.Range(_)),
+        conditions.map(conditionToHeader)
+      ).flatten: List[HttpHeader]
+    )
+    sendBucketRequest(bucket, signedRequest(request)).map { response =>
+      response.status match {
+        case StatusCodes.OK =>
+          Right(S3Object(
+            S3ObjectMetadata(response.headers.map(h => h.name -> h.value).toMap),
+            // TODO think this through carefully - can we leverage FileBytes for example?
+            response.entity.data.toByteString
+          ))
+
+        case StatusCodes.NotFound => Left(DoesNotExist)
+        case StatusCodes.NotModified => Left(NotModified)
+        case StatusCodes.PreconditionFailed if conditions.exists(i => i.isInstanceOf[IfMatch] || i.isInstanceOf[IfNotModifiedSince]) => Left(NotModified)
+        case _ => exceptionFor(response)
+      }
     }
   }
 
   // helpers
+
+  private def conditionToHeader(condition: GetObjectCondition): HttpHeader = condition match {
+    case IfMatch(ETag(tag)) => HttpHeaders.`If-Match`(EntityTag(tag))
+    case IfNotMatch(ETag(tag)) => HttpHeaders.`If-None-Match`(EntityTag(tag))
+    case IfModifiedSince(date) => HttpHeaders.`If-Modified-Since`(DateTime(date.getTime))
+    case IfNotModifiedSince(date) => HttpHeaders.`If-Unmodified-Since`(DateTime(date.getTime))
+  }
 
   private def path(key: Key): Uri.Path = Uri.Path("/" + key.name)
 
@@ -99,12 +136,10 @@ private[s3] final class ConcreteS3Client(
 
 
   private def signedRequest(method: HttpMethod, uri: Uri): HttpRequest =
-    Authentication.signWithHeader(
-      HttpRequest(method, uri, List(HttpHeaders.Host(uri.authority.host.address))),
-      region,
-      service,
-      credentials
-    )
+    signedRequest(HttpRequest(method, uri, List(HttpHeaders.Host(uri.authority.host.address))))
+
+
+  private def signedRequest(request: HttpRequest) = Authentication.signWithHeader(request, region, service, credentials)
 
   private def sendRequest(request: HttpRequest): Future[HttpResponse] =
     baseConnectorInfo.flatMap(_.hostConnector ? request).mapTo[HttpResponse]

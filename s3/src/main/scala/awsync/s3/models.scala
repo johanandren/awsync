@@ -44,8 +44,12 @@ case class S3ObjectMetadata(private val headers: Map[String, String]) {
   def valueFor(headerName: String): Option[String] = headers.get(headerName)
 }
 
+sealed trait NoObjectReason
+case object NotModified extends NoObjectReason
+case object ETagMismatch extends NoObjectReason
+
 
 
 sealed trait NoAccessReason
-case object DoesNotExist extends NoAccessReason
+case object DoesNotExist extends NoAccessReason with NoObjectReason
 case object PermissionDenied extends NoAccessReason

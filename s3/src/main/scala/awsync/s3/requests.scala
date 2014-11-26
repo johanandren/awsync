@@ -15,7 +15,8 @@ import java.util.Date
 case class ListObjectsConfig(delimiter: Option[String], marker: Option[String] , maxKeys: Option[Int], prefix: Option[String])
 
 
-sealed trait ETagMatch
-case class IfMatch(tag: ETag) extends ETagMatch
-case class IfNoneMatch(tag: ETag) extends ETagMatch
-case class GetObjectConfig(ifModifiedSince: Option[Date], ifUnmodifiedSince: Option[Date], etagMatch: Option[ETagMatch])
+sealed trait GetObjectCondition
+case class IfMatch(tag: ETag) extends GetObjectCondition
+case class IfNotMatch(tag: ETag) extends GetObjectCondition
+case class IfModifiedSince(date: Date) extends GetObjectCondition
+case class IfNotModifiedSince(date: Date) extends GetObjectCondition

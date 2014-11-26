@@ -29,4 +29,5 @@ private[awsync] object DateUtils {
     dateFormat.setTimeZone(TimeZone.getTimeZone("GMT"))
     dateFormat.format(date)
   }
+
 }
