@@ -4,6 +4,8 @@ val akkaVersion = "2.3.7"
 
 val sprayVersion = "1.3.1"
 
+scalacOptions in Global ++= Seq("-deprecation", "-feature", "-unchecked")
+
 lazy val core = project
   .settings(
     libraryDependencies ++= Seq(
