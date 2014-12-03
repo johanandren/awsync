@@ -1,24 +1,19 @@
 package awsync.s3
 
 import java.util.Date
-
-import awsync.s3.ETagMismatch
-import awsync.utils.DateUtils
-import spray.http.Uri.Query
-
 import scala.concurrent.duration._
 import scala.collection.immutable.Seq
+import scala.xml.{Elem, XML}
+import scala.concurrent.Future
+import scala.util.Try
 import akka.pattern.ask
 import akka.actor.{ActorRef, ActorSystem}
 import akka.io.IO
-import akka.util.Timeout
-import awsync.{Service, Region, Credentials}
+import akka.util.{ByteString, Timeout}
+import spray.http.HttpHeaders.RawHeader
 import spray.can.Http
 import spray.http._
-
-import scala.concurrent.Future
-import scala.util.Try
-import scala.xml.{Elem, XML}
+import awsync.{Service, Region, Credentials}
 
 private[s3] object ConcreteS3Client {
 
@@ -83,7 +78,7 @@ private[s3] final class ConcreteS3Client(
     sendBucketRequest(bucket, request)
       .map { response =>
         response.status match {
-          case StatusCodes.OK => Some(S3ObjectMetadata(response.headers.map(h => h.name -> h.value).toMap))
+          case StatusCodes.OK => Some(S3ObjectMetadata(response.headers.map(h => h.name -> h.value)))
           case StatusCodes.NotFound => None
           case _ => exceptionFor(response)
         }
@@ -103,7 +98,7 @@ private[s3] final class ConcreteS3Client(
       response.status match {
         case StatusCodes.OK =>
           Right(S3Object(
-            S3ObjectMetadata(response.headers.map(h => h.name -> h.value).toMap),
+            S3ObjectMetadata(response.headers.map(h => h.name -> h.value)),
             // TODO think this through carefully - can we leverage FileBytes for example?
             response.entity.data.toByteString
           ))
@@ -116,7 +111,38 @@ private[s3] final class ConcreteS3Client(
     }
   }
 
+
+  override def createObject(bucket: BucketName, key: Key, data: ByteString, config: CreateObjectConfig): Future[Unit] = {
+    val uri = bucketBaseUri(bucket).withPath(path(key))
+
+    val headers: List[HttpHeader] =
+      List(
+        Some[HttpHeader](HttpHeaders.Host(uri.authority.host.address)),
+        config.cacheControl.map(HttpHeaders.`Cache-Control`(_)),
+        /* config.cannedAcl.fold(
+           canned -> None //Some(RawHeader("x-amz-acl" -> canned.name)),
+           permissions -> None
+         */
+        config.contentDisposition.map(HttpHeaders.`Content-Disposition`(_)),
+        config.contentType.map(t => HttpHeaders.`Content-Type`(ContentType(MediaType.custom(t)))),
+        Some(RawHeader("x-amz-storage-class", config.storageClass.name))
+      ).flatten ++ config.customMetadata.map(t => RawHeader(t._1.name, t._2))
+
+    val request = HttpRequest(PUT, uri,
+      headers,
+      HttpData(data)
+    )
+
+    // TOOD body md5 somehow
+    // MD5.hash(data)
+
+    sendBucketRequest(bucket, signedRequest(request)).map { response => () }
+  }
+
+
+
   // helpers
+
 
   private def conditionToHeader(condition: GetObjectCondition): HttpHeader = condition match {
     case IfMatch(ETag(tag)) => HttpHeaders.`If-Match`(EntityTag(tag))

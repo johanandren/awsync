@@ -5,6 +5,7 @@ import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
 
 import akka.util.ByteString
+import awsync.utils.Hex
 import spray.http.HttpData.Bytes
 import spray.http.HttpEntity
 import spray.http.HttpEntity.{Empty, NonEmpty}
@@ -14,7 +15,7 @@ private[authentication] object Sha256 {
   // not thread safe so must be created for each calculation
   private def sha256 = MessageDigest.getInstance("SHA-256")
 
-  def createHash(bytes: Array[Byte]): String = Utils.hexEncode(sha256.digest(bytes))
+  def createHash(bytes: Array[Byte]): String = Hex.hexEncode(sha256.digest(bytes))
 
   def createHash(s: String): String = createHash(s.getBytes)
 
@@ -25,9 +26,10 @@ private[authentication] object Sha256 {
     createHash(array)
   }
 
-  def bodyHash(body: HttpEntity): String = body match {
-    case NonEmpty(_, Bytes(bytes)) => createHash(bytes)
+  def bodyHash(body: HttpEntity, chunked: Boolean): String = body match {
+    case _ if chunked => "STREAMING-AWS4-HMAC-SHA256-PAYLOAD"
     case Empty => createHash("")
+    case NonEmpty(_, Bytes(bytes)) => createHash(bytes)
     case x => throw new RuntimeException(s"Unsupported body type $x")
   }
 

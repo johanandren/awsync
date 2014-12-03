@@ -35,7 +35,7 @@ private[s3] object ListObjects {
             ETag((content \ "ETag").text),
             ByteSize(size),
             storageClass,
-            Owner(
+            User(
               OwnerId((content \ "ID").text),
               (content \ "DisplayName").text
             )

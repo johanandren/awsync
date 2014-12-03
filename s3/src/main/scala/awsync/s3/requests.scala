@@ -1,6 +1,9 @@
 package awsync.s3
 
 import java.util.Date
+import spray.http.{CacheDirective, HttpHeaders, HttpHeader}
+
+import scala.collection.immutable.Seq
 
 /**
  * @param delimiter A delimiter is a character you use to group keys.
@@ -15,8 +18,19 @@ import java.util.Date
 case class ListObjectsConfig(delimiter: Option[String], marker: Option[String] , maxKeys: Option[Int], prefix: Option[String])
 
 
+/** A condition that needs to be fulfilled for an object to actually be fetched */
 sealed trait GetObjectCondition
 case class IfMatch(tag: ETag) extends GetObjectCondition
 case class IfNotMatch(tag: ETag) extends GetObjectCondition
 case class IfModifiedSince(date: Date) extends GetObjectCondition
 case class IfNotModifiedSince(date: Date) extends GetObjectCondition
+
+case class CreateObjectConfig(
+    storageClass: StorageClass with ForCreate = StorageClasses.Standard,
+    cannedAcl: Either[CannedAcl with ForObject, Seq[Permission]] = Left(CannedAcls.Private),
+    cacheControl: Option[CacheDirective] = None,
+    contentDisposition: Option[String] = None,
+    contentType: Option[String] = None,
+    customMetadata: Seq[(CustomMetadataKey, String)] = Seq()
+)
+

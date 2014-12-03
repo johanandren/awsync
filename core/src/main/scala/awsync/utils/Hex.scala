@@ -1,6 +1,6 @@
-package awsync.authentication
+package awsync.utils
 
-private[authentication] object Utils {
+private[awsync] object Hex {
 
   def hexEncode(bytes: Array[Byte]): String =
     bytes.foldLeft(StringBuilder.newBuilder) { (acc, byte) =>

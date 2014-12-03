@@ -4,10 +4,17 @@ import java.util.Date
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.collection.immutable.Seq
 import scala.concurrent.Future
+import akka.util.ByteString
 import akka.actor.ActorSystem
 import spray.http.ByteRange
 import awsync.{Region, Credentials}
 
+/**
+ * API for interacting with amazon s3
+ *
+ * In general failures are returned as failed futures containing an exception, some operations
+ * have return types for some of the failures that might occur.
+ */
 trait S3Client {
 
   /** @return Each bucket owned by the account along with the date it was created */
@@ -49,6 +56,11 @@ trait S3Client {
    * @return Either the reason why it was not fetched or the object data
    */
   def getObject(bucket: BucketName, key: Key, range: Option[ByteRange], conditions: Option[GetObjectCondition]): Future[Either[NoObjectReason, S3Object]]
+
+  /**
+   * Create a new object under the given key
+   */
+  def createObject(bucket: BucketName, key: Key, data: ByteString, config: CreateObjectConfig): Future[Unit]
 
 }
 

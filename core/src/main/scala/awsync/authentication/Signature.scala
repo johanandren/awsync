@@ -4,7 +4,7 @@ import java.util.Date
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
 
-import awsync.utils.DateUtils
+import awsync.utils.{Hex, DateUtils}
 import awsync.{Service, Region, AwsSecret}
 
 private[authentication] object Signature {
@@ -18,7 +18,7 @@ private[authentication] object Signature {
     val regionKey = hmacSHA256(region.name, dateKey)
     val serviceKey = hmacSHA256(service.name, regionKey)
     val signingKey = hmacSHA256("aws4_request", serviceKey)
-    Utils.hexEncode(hmacSHA256(stringToSign, signingKey))
+    Hex.hexEncode(hmacSHA256(stringToSign, signingKey))
   }
 
 

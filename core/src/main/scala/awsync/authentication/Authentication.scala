@@ -24,7 +24,8 @@ object Authentication {
 
   def signWithHeader(request: HttpRequest, region: Region, service: Service, credentials: Credentials, date: Date): HttpRequest = {
 
-    val bodyHash = Sha256.bodyHash(request.entity)
+    // TODO how do we know that it is chunked?
+    val bodyHash = Sha256.bodyHash(request.entity, chunked = false)
 
     val requestWithDate = request.withHeaders(
       request.headers ++ Seq(AwsHeaders.AmzDate(date), RawHeader("x-amz-content-sha256", bodyHash))

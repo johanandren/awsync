@@ -1,5 +1,6 @@
 package awsync.authentication
 
+import awsync.utils.Hex
 import spray.http._
 import collection.immutable.Seq
 
@@ -24,7 +25,7 @@ private[authentication] object CanonicalRequest {
     else path.render(new StringRendering).get
 
   def encodeParameters(query: Uri.Query): String =
-    query.map(t => Utils.uriEncode(t._1) + "=" + Utils.uriEncode(t._2))
+    query.map(t => Hex.uriEncode(t._1) + "=" + Hex.uriEncode(t._2))
       .sorted
       .mkString("&")
 
