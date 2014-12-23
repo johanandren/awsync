@@ -19,3 +19,6 @@ project/plugins/project/
 # idea
 .idea
 .idea_modules
+
+# zsh .env
+.env

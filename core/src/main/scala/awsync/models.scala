@@ -27,6 +27,7 @@ object Credentials {
 case class Region(location: String, name: String)
 
 object Regions {
+  // the current set of existing regions:
   val USEast = Region("US East (N. Virginia)", "us-east-1")
   val USWest1 = Region("US West (N. California)", "us-west-1")
   val USWest2 = Region("US West (Oregon)", "us-west-2")
@@ -36,6 +37,13 @@ object Regions {
   val AsiaPacificSouthEast2 = Region("Asia Pacific (Sydney)", "ap-southeast-2")
   val AsiaPacificNorthEast = Region("Asia Pacific (Tokyo)", "ap-northeast-1")
   val SouthAmerica = Region("South America (Sao Paulo)", "sa-east-1")
+
+  /** all the regions */
+  lazy val all = Set(USEast, USWest1, USWest2, EUWest, EUCentral, AsiaPacificNorthEast, AsiaPacificSouthEast1, AsiaPacificSouthEast2, SouthAmerica)
+
+  /** @return get region from amazon region name, None if the name is unknown */
+  def fromName(name: String): Option[Region] = all.find(_.name == name)
+
 }
 
 /**

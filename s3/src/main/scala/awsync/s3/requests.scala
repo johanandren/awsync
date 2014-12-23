@@ -17,6 +17,10 @@ import scala.collection.immutable.Seq
  */
 case class ListObjectsConfig(delimiter: Option[String], marker: Option[String] , maxKeys: Option[Int], prefix: Option[String])
 
+object ListObjectsConfig {
+  val default = ListObjectsConfig(None, None, None, None)
+}
+
 
 /** A condition that needs to be fulfilled for an object to actually be fetched */
 sealed trait GetObjectCondition
@@ -24,6 +28,10 @@ case class IfMatch(tag: ETag) extends GetObjectCondition
 case class IfNotMatch(tag: ETag) extends GetObjectCondition
 case class IfModifiedSince(date: Date) extends GetObjectCondition
 case class IfNotModifiedSince(date: Date) extends GetObjectCondition
+
+object CreateObjectConfig {
+  val default = CreateObjectConfig()
+}
 
 case class CreateObjectConfig(
     storageClass: StorageClass with ForCreate = StorageClasses.Standard,

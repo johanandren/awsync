@@ -13,7 +13,7 @@ import akka.util.{ByteString, Timeout}
 import spray.http.HttpHeaders.RawHeader
 import spray.can.Http
 import spray.http._
-import awsync.{Service, Region, Credentials}
+import awsync.{Regions, Service, Region, Credentials}
 
 private[s3] object ConcreteS3Client {
 
@@ -36,7 +36,8 @@ private[s3] final class ConcreteS3Client(
   import ConcreteS3Client._
   import awsync.authentication.Authentication
   import HttpMethods._
-  import system.dispatcher
+
+  override implicit val executionContext = system.dispatcher
 
   implicit val timeout: Timeout = 30.seconds
   private val (protocol, port) = if (https) ("https", 443) else ("http", 80)
@@ -47,7 +48,7 @@ private[s3] final class ConcreteS3Client(
   // api implementation
 
   override def listBuckets: Future[Seq[(BucketName, Date)]] =
-    sendRequest(signedRequest(GET, baseUri))
+    sendRequest(signedRequest(GET, baseUri)(Regions.USEast))
       .map(handleResponse(parsers.ListBuckets.parse))
 
   override def listObjects(bucket: BucketName, config: ListObjectsConfig): Future[(ListObjectsInfo, Seq[KeyDetails])] = {
@@ -58,12 +59,12 @@ private[s3] final class ConcreteS3Client(
       config.prefix.map("prefix" -> _)
     )
     val uri = bucketBaseUri(bucket).withQuery(parameters.flatten: _*)
-    sendBucketRequest(bucket, signedRequest(GET, uri))
+    sendBucketRequest(bucket, signedRequest(GET, uri)(region))
       .map(handleResponse(parsers.ListObjects.parse))
   }
 
   override def canAccess(bucket: BucketName): Future[Option[NoAccessReason]] =
-    sendBucketRequest(bucket, signedRequest(HEAD, bucketBaseUri(bucket)))
+    sendBucketRequest(bucket, signedRequest(HEAD, bucketBaseUri(bucket))(region))
       .map { response =>
         response.status match {
           case StatusCodes.OK => None
@@ -74,7 +75,7 @@ private[s3] final class ConcreteS3Client(
       }
 
   override def getObjectMetadata(bucket: BucketName, key: Key): Future[Option[S3ObjectMetadata]] = {
-    val request = signedRequest(HEAD, bucketBaseUri(bucket).withPath(path(key)))
+    val request = signedRequest(HEAD, bucketBaseUri(bucket).withPath(path(key)))(region)
     sendBucketRequest(bucket, request)
       .map { response =>
         response.status match {
@@ -94,7 +95,7 @@ private[s3] final class ConcreteS3Client(
         conditions.map(conditionToHeader)
       ).flatten: List[HttpHeader]
     )
-    sendBucketRequest(bucket, signedRequest(request)).map { response =>
+    sendBucketRequest(bucket, signedRequest(request)(region)).map { response =>
       response.status match {
         case StatusCodes.OK =>
           Right(S3Object(
@@ -136,9 +137,25 @@ private[s3] final class ConcreteS3Client(
     // TOOD body md5 somehow
     // MD5.hash(data)
 
-    sendBucketRequest(bucket, signedRequest(request)).map { response => () }
+    sendBucketRequest(bucket, signedRequest(request)(region)).map { response => () }
   }
 
+
+  /**
+   * Delete the object at the given key
+   */
+  override def deleteObject(bucket: BucketName, key: Key): Future[Unit] = {
+    val request = signedRequest(DELETE, bucketBaseUri(bucket).withPath(path(key)))(region)
+    sendBucketRequest(bucket, request)
+      .map { response =>
+      response.status match {
+        case StatusCodes.NoContent => Unit
+        case StatusCodes.NotFound => throw new RuntimeException(s"Cannot delete key $bucket $key because it does not exist")
+        case _ => exceptionFor(response)
+      }
+    }
+
+  }
 
 
   // helpers
@@ -160,12 +177,10 @@ private[s3] final class ConcreteS3Client(
   private def exceptionFor(response: HttpResponse): Nothing =
     throw new RuntimeException(s"Failed request, status: ${response.status}, body: ${response.entity.asString}")
 
+  private def signedRequest(method: HttpMethod, uri: Uri)(region: Region): HttpRequest =
+    signedRequest(HttpRequest(method, uri, List(HttpHeaders.Host(uri.authority.host.address))))(region)
 
-  private def signedRequest(method: HttpMethod, uri: Uri): HttpRequest =
-    signedRequest(HttpRequest(method, uri, List(HttpHeaders.Host(uri.authority.host.address))))
-
-
-  private def signedRequest(request: HttpRequest) = Authentication.signWithHeader(request, region, service, credentials)
+  private def signedRequest(request: HttpRequest)(region: Region) = Authentication.signWithHeader(request, region, service, credentials)
 
   private def sendRequest(request: HttpRequest): Future[HttpResponse] =
     baseConnectorInfo.flatMap(_.hostConnector ? request).mapTo[HttpResponse]

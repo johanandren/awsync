@@ -14,13 +14,22 @@ trait ForBucket
 trait ForObject
 
 case class BucketName(name: String)
-case class Key(name: String)
+case class Key(name: String) {
+  // note that this is not watertight since the string might entirely consist of
+  // chars that take more than one byte, but it is too costly to re-encode every
+  // key to bytes just to check on each creation
+  assert(name.length < 1024, "S3 does not allow keys longer than 1024 bytes")
+
+  def /(suffix: String): Key = Key(s"$name/$suffix")
+
+
+}
+
 case class ETag(tag: String)
 case class ByteSize(bytes: Long) {
   def kb: BigDecimal = BigDecimal(bytes) / 1000
   def mb: BigDecimal = kb / 1000
 }
-
 
 
 sealed abstract class StorageClass(private[s3] val name: String)
@@ -84,4 +93,4 @@ case object ETagMismatch extends NoObjectReason
 
 sealed trait NoAccessReason
 case object DoesNotExist extends NoAccessReason with NoObjectReason
-case object PermissionDenied extends NoAccessReason
+case object PermissionDenied extends NoAccessReason with NoObjectReason
