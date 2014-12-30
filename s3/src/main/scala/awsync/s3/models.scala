@@ -22,7 +22,6 @@ case class Key(name: String) {
 
   def /(suffix: String): Key = Key(s"$name/$suffix")
 
-
 }
 
 case class ETag(tag: String)

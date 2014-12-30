@@ -1,4 +1,4 @@
-package awsync.s3.parsers
+package awsync.s3.xml
 
 import awsync.s3._
 import awsync.utils.Functional
@@ -9,7 +9,7 @@ import scala.xml.Elem
 
 private[s3] object ListObjects {
 
-  def parse(xml: Elem): Try[(ListObjectsInfo, Seq[KeyDetails])] = {
+  def fromXml(xml: Elem): Try[(ListObjectsInfo, Seq[KeyDetails])] = {
     def parseInfo =
       for {
         maxKeys <- Try((xml \ "MaxKeys").text.toInt)

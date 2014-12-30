@@ -82,11 +82,11 @@ trait LowLevelObjectOperations {
    */
   def getObject(bucket: BucketName, key: Key, range: Option[ByteRange], conditions: Option[GetObjectCondition]): Future[Either[NoObjectReason, S3Object]]
 
-  /**
-   * Delete the object at the given key
-   */
+  /** Delete the object at the given key */
   def deleteObject(bucket: BucketName, key: Key): Future[Unit]
 
+  /** Delete multiple objects with one request (max 1000) */
+  def deleteObjects(bucket: BucketName, keys: Seq[Key]): Future[Unit]
 }
 
 trait LowLevelBucketOperations {

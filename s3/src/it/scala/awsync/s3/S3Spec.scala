@@ -1,5 +1,6 @@
 package awsync.s3
 
+import scala.collection.immutable.Seq
 import akka.actor.ActorSystem
 import akka.util.ByteString
 import awsync.{Region, Regions, Credentials}
@@ -70,6 +71,22 @@ class S3Spec extends FunSpec with Matchers with ScalaFutures with BeforeAndAfter
       val result = client.getObject(bucket, key, None, None)
 
       result.futureValue should be (Left(DoesNotExist))
+    }
+
+    it("deletes multiple keys") {
+      val key1 = Key("it-test-delete-object-1")
+      val key2 = Key("it-test-delete-object-2")
+      val data = ByteString("some data".getBytes("UTF-8"))
+
+      val result =
+        for {
+          _ <- client.createObject(bucket, key1, data, CreateObjectConfig.default)
+          _ <- client.createObject(bucket, key2, data, CreateObjectConfig.default)
+          _ <- client.deleteObjects(bucket, Seq(key1, key2))
+          items <- client.listAllObjects(bucket)
+        } yield items
+
+      result.futureValue should be (empty)
     }
 
   }

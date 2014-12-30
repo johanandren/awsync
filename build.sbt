@@ -25,6 +25,7 @@ lazy val s3 = project
   .settings(
     libraryDependencies ++= Seq(
       "io.spray" %% "spray-client" % versions.spray,
+      "io.spray" %% "spray-httpx" % versions.spray,
       "com.typesafe.akka" %% "akka-actor" % versions.akka,
       "org.scalatest" %% "scalatest" % versions.scalaTest % "it,test",
       "com.typesafe" % "config" % "1.2.1" % "test"

@@ -1,4 +1,4 @@
-package awsync.s3.parsers
+package awsync.s3.xml
 
 import awsync.s3._
 
@@ -37,7 +37,7 @@ class ListObjectsSpec extends AbstractSpec {
         </Contents>
       </ListBucketResult>
 
-      val result = ListObjects.parse(xml)
+      val result = ListObjects.fromXml(xml)
       result.isSuccess should be (true)
       val (info, items)= result.get
       info.bucket should be (BucketName("quotes"))

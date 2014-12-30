@@ -1,55 +1,61 @@
 package awsync.s3
 
 import java.util.Date
-import scala.concurrent.duration._
+import spray.httpx.marshalling.Marshaller
+
 import scala.collection.immutable.Seq
 import scala.xml.{Elem, XML}
 import scala.concurrent.Future
 import scala.util.Try
-import akka.pattern.ask
-import akka.actor.{ActorRef, ActorSystem}
-import akka.io.IO
-import akka.util.{ByteString, Timeout}
+import akka.actor.ActorSystem
+import akka.util.ByteString
 import spray.http.HttpHeaders.RawHeader
-import spray.can.Http
 import spray.http._
-import awsync.{Regions, Service, Region, Credentials}
+import awsync.{Regions, Region, Credentials}
 
 private[s3] object ConcreteS3Client {
 
   def apply(credentials: Credentials, region: Region, https: Boolean = true)(implicit system: ActorSystem): S3Client =
     new ConcreteS3Client(credentials, region, https)(system)
 
+  private def conditionToHeader(condition: GetObjectCondition): HttpHeader = condition match {
+    case IfMatch(ETag(tag)) => HttpHeaders.`If-Match`(EntityTag(tag))
+    case IfNotMatch(ETag(tag)) => HttpHeaders.`If-None-Match`(EntityTag(tag))
+    case IfModifiedSince(date) => HttpHeaders.`If-Modified-Since`(DateTime(date.getTime))
+    case IfNotModifiedSince(date) => HttpHeaders.`If-Unmodified-Since`(DateTime(date.getTime))
+  }
 
-  private val service = Service("s3")
+  private def path(key: Key): Uri.Path = Uri.Path("/" + key.name)
+
+  private def handleResponse[A](operation: String)(onOk: Elem => Try[A])(response: HttpResponse): A =
+    if (response.status == StatusCodes.OK) onOk(XML.loadString(response.entity.asString)).get
+    else throw exceptionFor(response, operation)
+
+  private def exceptionFor(response: HttpResponse, operation: String): Nothing =
+    throw new RuntimeException(s"Failed request $operation, status: ${response.status}, body: ${response.entity.asString}")
+
+
+
 
 }
 
 private[s3] final class ConcreteS3Client(
     credentials: Credentials,
     region: Region,
-    https: Boolean
+    val https: Boolean
   )(
-    implicit system: ActorSystem
-  ) extends S3Client {
+    implicit val system: ActorSystem
+  ) extends S3Connections with S3Client {
 
-  import ConcreteS3Client._
-  import awsync.authentication.Authentication
   import HttpMethods._
-
-  override implicit val executionContext = system.dispatcher
-
-  implicit val timeout: Timeout = 30.seconds
-  private val (protocol, port) = if (https) ("https", 443) else ("http", 80)
-
-  private val baseUri = Uri(s"$protocol://s3.amazonaws.com")
-  private def bucketBaseUri(bucket: BucketName) = Uri(s"$protocol://${bucket.name}.s3.amazonaws.com")
+  import RequestUtils._
+  import ConcreteS3Client._
 
   // api implementation
 
   override def listBuckets: Future[Seq[(BucketName, Date)]] =
-    sendRequest(signedRequest(GET, baseUri)(Regions.USEast))
-      .map(handleResponse(parsers.ListBuckets.parse))
+    sendRequest(signedRequest(GET, baseUri, Regions.USEast, credentials))
+      .map(handleResponse("listing buckets")(xml.ListBuckets.fromXml))
 
   override def listObjects(bucket: BucketName, config: ListObjectsConfig): Future[(ListObjectsInfo, Seq[KeyDetails])] = {
     val parameters = Seq(
@@ -59,29 +65,29 @@ private[s3] final class ConcreteS3Client(
       config.prefix.map("prefix" -> _)
     )
     val uri = bucketBaseUri(bucket).withQuery(parameters.flatten: _*)
-    sendBucketRequest(bucket, signedRequest(GET, uri)(region))
-      .map(handleResponse(parsers.ListObjects.parse))
+    sendBucketRequest(bucket, signedRequest(GET, uri, region, credentials))
+      .map(handleResponse("listing objects")(xml.ListObjects.fromXml))
   }
 
   override def canAccess(bucket: BucketName): Future[Option[NoAccessReason]] =
-    sendBucketRequest(bucket, signedRequest(HEAD, bucketBaseUri(bucket))(region))
+    sendBucketRequest(bucket, signedRequest(HEAD, bucketBaseUri(bucket), region, credentials))
       .map { response =>
         response.status match {
           case StatusCodes.OK => None
           case StatusCodes.NotFound => Some(DoesNotExist)
           case StatusCodes.Forbidden => Some(PermissionDenied)
-          case _ => exceptionFor(response)
+          case _ => exceptionFor(response, s"checking if we have access to bucket $bucket")
         }
       }
 
   override def getObjectMetadata(bucket: BucketName, key: Key): Future[Option[S3ObjectMetadata]] = {
-    val request = signedRequest(HEAD, bucketBaseUri(bucket).withPath(path(key)))(region)
+    val request = signedRequest(HEAD, bucketBaseUri(bucket).withPath(path(key)), region, credentials)
     sendBucketRequest(bucket, request)
       .map { response =>
         response.status match {
           case StatusCodes.OK => Some(S3ObjectMetadata(response.headers.map(h => h.name -> h.value)))
           case StatusCodes.NotFound => None
-          case _ => exceptionFor(response)
+          case _ => exceptionFor(response, s"fetching metadata for $key")
         }
     }
   }
@@ -95,7 +101,7 @@ private[s3] final class ConcreteS3Client(
         conditions.map(conditionToHeader)
       ).flatten: List[HttpHeader]
     )
-    sendBucketRequest(bucket, signedRequest(request)(region)).map { response =>
+    sendBucketRequest(bucket, signedRequest(request, region, credentials)).map { response =>
       response.status match {
         case StatusCodes.OK =>
           Right(S3Object(
@@ -107,7 +113,7 @@ private[s3] final class ConcreteS3Client(
         case StatusCodes.NotFound => Left(DoesNotExist)
         case StatusCodes.NotModified => Left(NotModified)
         case StatusCodes.PreconditionFailed if conditions.exists(i => i.isInstanceOf[IfMatch] || i.isInstanceOf[IfNotModifiedSince]) => Left(NotModified)
-        case _ => exceptionFor(response)
+        case _ => exceptionFor(response, "fetching object")
       }
     }
   }
@@ -134,68 +140,38 @@ private[s3] final class ConcreteS3Client(
       HttpData(data)
     )
 
-    // TOOD body md5 somehow
-    // MD5.hash(data)
-
-    sendBucketRequest(bucket, signedRequest(request)(region)).map { response => () }
+    sendBucketRequest(bucket, signedRequest(request, region, credentials)).map { response => () }
   }
 
 
-  /**
-   * Delete the object at the given key
-   */
   override def deleteObject(bucket: BucketName, key: Key): Future[Unit] = {
-    val request = signedRequest(DELETE, bucketBaseUri(bucket).withPath(path(key)))(region)
+    val request = signedRequest(DELETE, bucketBaseUri(bucket).withPath(path(key)), region, credentials)
     sendBucketRequest(bucket, request)
       .map { response =>
       response.status match {
         case StatusCodes.NoContent => Unit
         case StatusCodes.NotFound => throw new RuntimeException(s"Cannot delete key $bucket $key because it does not exist")
-        case _ => exceptionFor(response)
+        case _ => exceptionFor(response, "deleting object")
       }
     }
 
   }
 
 
-  // helpers
+  override def deleteObjects(bucket: BucketName, keys: Seq[Key]): Future[Unit] = {
+    val body = spray.httpx.marshalling.marshalUnsafe(xml.DeleteKeys.toXml(keys))
 
+    val request = signedRequest(POST, bucketBaseUri(bucket).withQuery("delete"), body, region, credentials)
 
-  private def conditionToHeader(condition: GetObjectCondition): HttpHeader = condition match {
-    case IfMatch(ETag(tag)) => HttpHeaders.`If-Match`(EntityTag(tag))
-    case IfNotMatch(ETag(tag)) => HttpHeaders.`If-None-Match`(EntityTag(tag))
-    case IfModifiedSince(date) => HttpHeaders.`If-Modified-Since`(DateTime(date.getTime))
-    case IfNotModifiedSince(date) => HttpHeaders.`If-Unmodified-Since`(DateTime(date.getTime))
+    sendBucketRequest(bucket, request)
+      .map { response =>
+        response.status match {
+          case StatusCodes.OK =>
+            // TODO parse response and throw error with the failed deletes if there were any
+            Unit
+          case _ => exceptionFor(response, "deleting multiple object")
+        }
+      }
   }
-
-  private def path(key: Key): Uri.Path = Uri.Path("/" + key.name)
-
-  private def handleResponse[A](onOk: Elem => Try[A])(response: HttpResponse): A =
-    if (response.status == StatusCodes.OK) onOk(XML.loadString(response.entity.asString)).get
-    else throw exceptionFor(response)
-
-  private def exceptionFor(response: HttpResponse): Nothing =
-    throw new RuntimeException(s"Failed request, status: ${response.status}, body: ${response.entity.asString}")
-
-  private def signedRequest(method: HttpMethod, uri: Uri)(region: Region): HttpRequest =
-    signedRequest(HttpRequest(method, uri, List(HttpHeaders.Host(uri.authority.host.address))))(region)
-
-  private def signedRequest(request: HttpRequest)(region: Region) = Authentication.signWithHeader(request, region, service, credentials)
-
-  private def sendRequest(request: HttpRequest): Future[HttpResponse] =
-    baseConnectorInfo.flatMap(_.hostConnector ? request).mapTo[HttpResponse]
-
-  private def sendBucketRequest(bucket: BucketName, request: HttpRequest): Future[HttpResponse] =
-    bucketConnectorInfo(bucket).flatMap(_.hostConnector ? request).mapTo[HttpResponse]
-
-
-  // host connectors - spray will manage a pool of instances for each host for us
-  // TODO maybe tweak the size of those pools somehow?
-  private def baseConnectorInfo: Future[Http.HostConnectorInfo]  =
-    (IO(Http) ? Http.HostConnectorSetup("s3.amazonaws.com", port)).mapTo[Http.HostConnectorInfo]
-
-  private def bucketConnectorInfo(bucket: BucketName): Future[Http.HostConnectorInfo] =
-    (IO(Http) ? Http.HostConnectorSetup(s"${bucket.name}.s3.amazonaws.com", port))
-      .mapTo[Http.HostConnectorInfo]
 
 }

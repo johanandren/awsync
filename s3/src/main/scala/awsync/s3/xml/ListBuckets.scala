@@ -1,4 +1,4 @@
-package awsync.s3.parsers
+package awsync.s3.xml
 
 import java.util.Date
 
@@ -11,7 +11,7 @@ import awsync.utils.Functional.sequence
 
 object ListBuckets {
 
-  def parse(xml: Elem): Try[Seq[(BucketName, Date)]] =
+  def fromXml(xml: Elem): Try[Seq[(BucketName, Date)]] =
     sequence((xml \\ "Bucket").map { bucket =>
       for {
         name <- Success((bucket \ "Name").text)

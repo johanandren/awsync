@@ -1,4 +1,4 @@
-package awsync.s3.parsers
+package awsync.s3.xml
 
 import awsync.s3.BucketName
 import awsync.s3.AbstractSpec
@@ -21,7 +21,7 @@ class ListBucketsSpec extends AbstractSpec {
         </Buckets>
       </ListAllMyBucketsResult>
 
-      val result = ListBuckets.parse(xml)
+      val result = ListBuckets.fromXml(xml)
       result.isSuccess should be (true)
       result.get.map(_._1) should be (Seq(BucketName("sample")))
     }
