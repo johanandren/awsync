@@ -2,8 +2,8 @@ package awsync.s3
 
 import java.util.Date
 
+import akka.http.scaladsl.model.headers.ByteRange
 import akka.util.ByteString
-import spray.http.ByteRange
 
 import scala.collection.immutable.Seq
 import scala.concurrent.{ExecutionContext, Future}

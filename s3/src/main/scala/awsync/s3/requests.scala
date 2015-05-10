@@ -1,8 +1,7 @@
 package awsync.s3
 
 import java.util.Date
-import spray.http.{CacheDirective, HttpHeaders, HttpHeader}
-
+import akka.http.scaladsl.model.headers.CacheDirective
 import scala.collection.immutable.Seq
 
 /**

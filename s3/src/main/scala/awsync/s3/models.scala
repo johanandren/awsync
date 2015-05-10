@@ -1,12 +1,11 @@
 package awsync.s3
 
 import java.util.Date
-import spray.http.HttpHeaders.ModeledCompanion
+import akka.http.scaladsl.model._
 
 import scala.collection.immutable.Seq
 import akka.util.ByteString
 import awsync.utils.DateUtils
-import spray.http.HttpHeaders
 
 // marker traits for common types used for both buckets and objects but that have concrete types
 // that is only applicable for one of them
@@ -55,18 +54,18 @@ object CustomMetadataKey {
 }
 
 case class S3Object(metadata: S3ObjectMetadata, data: ByteString)
-case class S3ObjectMetadata(private val headers: Seq[(String, String)]) {
-  private lazy val map = headers.groupBy(_._1).map { case (key, values) => key -> values.map(_._2)}.toMap
-  def contentType: String = firstHeader(HttpHeaders.`Content-Type`).get
-  def contentDisposition: Option[String] = firstHeader(HttpHeaders.`Content-Disposition`)
-  def lastModified: Date = firstHeader(HttpHeaders.`Last-Modified`)
+case class S3ObjectMetadata(private val headerList: Seq[(String, String)]) {
+  private lazy val map = headerList.groupBy(_._1).map { case (key, values) => key -> values.map(_._2)}
+  def contentType: String = firstHeader(headers.`Content-Type`).get
+  def contentDisposition: Option[String] = firstHeader(headers.`Content-Disposition`)
+  def lastModified: Date = firstHeader(headers.`Last-Modified`)
     .map { s =>
       DateUtils.fromHttpDateFormat(s)
         .getOrElse(throw new RuntimeException(s"Invalid format for last modified date in metadata: $s"))
     }
     .getOrElse(throw new RuntimeException("No last modified date in metadata(?!)"))
 
-  def contentLength: Long = firstHeader(HttpHeaders.`Content-Length`).get.toLong
+  def contentLength: Long = firstHeader(headers.`Content-Length`).get.toLong
 
   /** the object version id */
   def version: String = oneValueFor("x-amz-version-id").get
@@ -83,7 +82,7 @@ case class S3ObjectMetadata(private val headers: Seq[(String, String)]) {
   def oneValueFor(key: CustomMetadataKey): Option[String] = oneValueFor(CustomMetadataKey.headerPrefix + key.name)
   def allValuesFor(key: CustomMetadataKey): Seq[String] = allValuesFor(CustomMetadataKey.headerPrefix + key.name)
 
-  private def firstHeader(header: ModeledCompanion): Option[String] = map.get(header.name).flatMap(_.headOption)
+  private def firstHeader(header: headers.ModeledCompanion): Option[String] = map.get(header.name).flatMap(_.headOption)
 }
 
 sealed trait NoObjectReason

@@ -1,7 +1,8 @@
 package awsync.s3
 
 import java.util.Date
-import spray.httpx.marshalling.Marshaller
+import akka.http.scaladsl.model._
+import akka.http.scaladsl.model.headers.ByteRange
 
 import scala.collection.immutable.Seq
 import scala.xml.{Elem, XML}
@@ -9,8 +10,6 @@ import scala.concurrent.Future
 import scala.util.Try
 import akka.actor.ActorSystem
 import akka.util.ByteString
-import spray.http.HttpHeaders.RawHeader
-import spray.http._
 import awsync.{Regions, Region, Credentials}
 
 private[s3] object ConcreteS3Client {
@@ -19,10 +18,10 @@ private[s3] object ConcreteS3Client {
     new ConcreteS3Client(credentials, region, https)(system)
 
   private def conditionToHeader(condition: GetObjectCondition): HttpHeader = condition match {
-    case IfMatch(ETag(tag)) => HttpHeaders.`If-Match`(EntityTag(tag))
-    case IfNotMatch(ETag(tag)) => HttpHeaders.`If-None-Match`(EntityTag(tag))
-    case IfModifiedSince(date) => HttpHeaders.`If-Modified-Since`(DateTime(date.getTime))
-    case IfNotModifiedSince(date) => HttpHeaders.`If-Unmodified-Since`(DateTime(date.getTime))
+    case IfMatch(ETag(tag)) => headers.`If-Match`(headers.EntityTag(tag))
+    case IfNotMatch(ETag(tag)) => headers.`If-None-Match`(headers.EntityTag(tag))
+    case IfModifiedSince(date) => headers.`If-Modified-Since`(DateTime(date.getTime))
+    case IfNotModifiedSince(date) => headers.`If-Unmodified-Since`(DateTime(date.getTime))
   }
 
   private def path(key: Key): Uri.Path = Uri.Path("/" + key.name)
@@ -96,8 +95,8 @@ private[s3] final class ConcreteS3Client(
     val uri = bucketBaseUri(bucket).withPath(path(key))
     val request = HttpRequest(GET, uri,
       List(
-        Some[HttpHeader](HttpHeaders.Host(uri.authority.host.address)),
-        range.map(HttpHeaders.Range(_)),
+        Some[HttpHeader](headers.Host(uri.authority.host.address)),
+        range.map(headers.Range(_)),
         conditions.map(conditionToHeader)
       ).flatten: List[HttpHeader]
     )
@@ -122,22 +121,22 @@ private[s3] final class ConcreteS3Client(
   override def createObject(bucket: BucketName, key: Key, data: ByteString, config: CreateObjectConfig): Future[Unit] = {
     val uri = bucketBaseUri(bucket).withPath(path(key))
 
-    val headers: List[HttpHeader] =
+    val headerList: List[HttpHeader] =
       List(
-        Some[HttpHeader](HttpHeaders.Host(uri.authority.host.address)),
-        config.cacheControl.map(HttpHeaders.`Cache-Control`(_)),
+        Some[HttpHeader](headers.Host(uri.authority.host.address)),
+        config.cacheControl.map(headers.`Cache-Control`(_)),
         /* config.cannedAcl.fold(
            canned -> None //Some(RawHeader("x-amz-acl" -> canned.name)),
            permissions -> None
          */
-        config.contentDisposition.map(HttpHeaders.`Content-Disposition`(_)),
-        config.contentType.map(t => HttpHeaders.`Content-Type`(ContentType(MediaType.custom(t)))),
-        Some(RawHeader("x-amz-storage-class", config.storageClass.name))
-      ).flatten ++ config.customMetadata.map(t => RawHeader(t._1.name, t._2))
+        config.contentDisposition.map(headers.`Content-Disposition`(_)),
+        config.contentType.map(t => headers.`Content-Type`(ContentType(MediaType.custom(t)))),
+        Some(headers.RawHeader("x-amz-storage-class", config.storageClass.name))
+      ).flatten ++ config.customMetadata.map(t => headers.RawHeader(t._1.name, t._2))
 
     val request = HttpRequest(PUT, uri,
-      headers,
-      HttpData(data)
+      headerList,
+      HttpEntity(data)
     )
 
     sendBucketRequest(bucket, signedRequest(request, region, credentials)).map { response => () }
@@ -159,7 +158,7 @@ private[s3] final class ConcreteS3Client(
 
 
   override def deleteObjects(bucket: BucketName, keys: Seq[Key]): Future[Unit] = {
-    val body = spray.httpx.marshalling.marshalUnsafe(xml.DeleteKeys.toXml(keys))
+    val body = xml.DeleteKeys.toXml(keys).toString
 
     val request = signedRequest(POST, bucketBaseUri(bucket).withQuery("delete"), body, region, credentials)
 

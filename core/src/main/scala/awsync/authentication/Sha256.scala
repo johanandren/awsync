@@ -4,11 +4,9 @@ import java.security.MessageDigest
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
 
+import akka.http.scaladsl.model.HttpEntity
 import akka.util.ByteString
 import awsync.utils.Hex
-import spray.http.HttpData.Bytes
-import spray.http.HttpEntity
-import spray.http.HttpEntity.{Empty, NonEmpty}
 
 private[authentication] object Sha256 {
 
@@ -26,10 +24,10 @@ private[authentication] object Sha256 {
     createHash(array)
   }
 
-  def bodyHash(body: HttpEntity, chunked: Boolean): String = body match {
-    case _ if chunked => "STREAMING-AWS4-HMAC-SHA256-PAYLOAD"
-    case Empty => createHash("")
-    case NonEmpty(_, Bytes(bytes)) => createHash(bytes)
+  def bodyHash(body: HttpEntity): String = body match {
+    case x if x.isChunked => "STREAMING-AWS4-HMAC-SHA256-PAYLOAD"
+    case HttpEntity.Empty => createHash("")
+    case HttpEntity.Strict(_, bytes) => createHash(bytes)
     case x => throw new RuntimeException(s"Unsupported body type $x")
   }
 
