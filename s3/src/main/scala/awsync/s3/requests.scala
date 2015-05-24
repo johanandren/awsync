@@ -1,7 +1,8 @@
 package awsync.s3
 
 import java.util.Date
-import akka.http.scaladsl.model.headers.CacheDirective
+import akka.http.scaladsl.model.{ContentType, MediaType}
+import akka.http.scaladsl.model.headers.{ContentDispositionType, CacheDirective}
 import scala.collection.immutable.Seq
 
 /**
@@ -14,7 +15,7 @@ import scala.collection.immutable.Seq
  *               a bucket into different groupings of keys. (You can think of using prefix to make groups in the
  *               same way you'd use a folder in a file system.)
  */
-case class ListObjectsConfig(delimiter: Option[String], marker: Option[String] , maxKeys: Option[Int], prefix: Option[String])
+case class ListObjectsConfig(delimiter: Option[String], marker: Option[String], maxKeys: Option[Int], prefix: Option[String])
 
 object ListObjectsConfig {
   val default = ListObjectsConfig(None, None, None, None)
@@ -36,8 +37,7 @@ case class CreateObjectConfig(
     storageClass: StorageClass with ForCreate = StorageClasses.Standard,
     cannedAcl: Either[CannedAcl with ForObject, Seq[Permission]] = Left(CannedAcls.Private),
     cacheControl: Option[CacheDirective] = None,
-    contentDisposition: Option[String] = None,
-    contentType: Option[String] = None,
+    contentDisposition: Option[ContentDispositionType] = None,
     customMetadata: Seq[(CustomMetadataKey, String)] = Seq()
 )
 

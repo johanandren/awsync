@@ -1,15 +1,19 @@
 package awsync.s3
 
+import akka.http.scaladsl.model.{ContentTypes}
+import akka.stream.ActorFlowMaterializer
+
 import scala.collection.immutable.Seq
 import akka.actor.ActorSystem
 import akka.util.ByteString
-import awsync.{Region, Regions, Credentials}
+import awsync.{Regions, Credentials}
 import com.typesafe.config.ConfigFactory
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.time.{Millis, Seconds, Span}
 import org.scalatest.{BeforeAndAfterAll, Matchers, FunSpec}
 
 class S3Spec extends FunSpec with Matchers with ScalaFutures with BeforeAndAfterAll {
+
 
   val config = ConfigFactory.load("it")
 
@@ -25,6 +29,7 @@ class S3Spec extends FunSpec with Matchers with ScalaFutures with BeforeAndAfter
     """.stripMargin))
 
   implicit val ec = system.dispatcher
+  implicit val fm = ActorFlowMaterializer()
   val client = S3Client(Credentials(s3Key, s3Secret), s3Region)
 
   implicit override val patienceConfig =
@@ -53,24 +58,26 @@ class S3Spec extends FunSpec with Matchers with ScalaFutures with BeforeAndAfter
 
     it("creates, fetches and deletes an object") {
       val key = Key("it-test-object")
+      val loc = FqKey(bucket, key)
       val data = ByteString("some data".getBytes("UTF-8"))
 
       val result =
         for {
-          _ <- client.createObject(bucket, key, data, CreateObjectConfig.default)
-          maybeObj <- client.getObject(bucket, key)
-          _ <- client.deleteObject(bucket, key)
-        } yield maybeObj.map(_.data)
+          _ <- client.createObject(loc, ContentTypes.`application/octet-stream` ,data, CreateObjectConfig.default)
+          (metadata, bytes) <- client.getObject(loc)
+          _ <- client.deleteObject(loc)
+        } yield bytes
 
-      result.futureValue should be (Some(data))
+      result.futureValue shouldEqual data
     }
 
     it("returns DoesNotExist when trying to fetch a non-existant key") {
       val key = Key("does-not-exist")
+      val loc = FqKey(bucket, key)
 
-      val result = client.getObject(bucket, key, None, None)
+      val result = client.getObject(loc)
 
-      result.futureValue should be (Left(DoesNotExist))
+      result.failed.futureValue should be(DoesNotExist)
     }
 
     it("deletes multiple keys") {
@@ -80,13 +87,13 @@ class S3Spec extends FunSpec with Matchers with ScalaFutures with BeforeAndAfter
 
       val result =
         for {
-          _ <- client.createObject(bucket, key1, data, CreateObjectConfig.default)
-          _ <- client.createObject(bucket, key2, data, CreateObjectConfig.default)
+          _ <- client.createObject(FqKey(bucket, key1), ContentTypes.`application/octet-stream`, data)
+          _ <- client.createObject(FqKey(bucket, key2), ContentTypes.`application/octet-stream`, data)
           _ <- client.deleteObjects(bucket, Seq(key1, key2))
-          items <- client.listAllObjects(bucket)
+          items <- client.listObjects(bucket)
         } yield items
 
-      result.futureValue should be (empty)
+      result.futureValue._2 should be (empty)
     }
 
   }
