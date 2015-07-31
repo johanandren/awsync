@@ -1,7 +1,7 @@
 package awsync.authentication
 
+import akka.http.scaladsl.model.{HttpHeader, Uri, HttpRequest}
 import awsync.utils.Hex
-import spray.http._
 import collection.immutable.Seq
 
 private[authentication] object CanonicalRequest {
@@ -22,7 +22,7 @@ private[authentication] object CanonicalRequest {
 
   def encodePath(path: Uri.Path): String =
     if (path.length == 0) "/"
-    else path.render(new StringRendering).get
+    else path.toString
 
   def encodeParameters(query: Uri.Query): String =
     query.map(t => Hex.uriEncode(t._1) + "=" + Hex.uriEncode(t._2))

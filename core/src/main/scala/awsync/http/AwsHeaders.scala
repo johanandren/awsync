@@ -1,9 +1,9 @@
 package awsync.http
 
 import java.util.Date
+import akka.http.scaladsl.model.HttpHeader
+import akka.http.scaladsl.model.headers.RawHeader
 import awsync.utils.DateUtils
-import spray.http.HttpHeader
-import spray.http.HttpHeaders.RawHeader
 
 object AwsHeaders {
 

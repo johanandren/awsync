@@ -1,27 +1,50 @@
 package awsync.s3
 
 import java.util.Date
-import spray.http.HttpHeaders.ModeledCompanion
+import akka.http.scaladsl.model._
 
 import scala.collection.immutable.Seq
-import akka.util.ByteString
 import awsync.utils.DateUtils
-import spray.http.HttpHeaders
+
+import scala.util.control.NoStackTrace
 
 // marker traits for common types used for both buckets and objects but that have concrete types
 // that is only applicable for one of them
 trait ForBucket
 trait ForObject
 
+/** fully qualified key */
+case class FqKey(bucket: BucketName, key: Key) {
+  /** the public url to the resource, where anyone can access it (if permissions are set to allow that) */
+  lazy val publicUrl: Uri = Uri(s"https://s3.amazonaws.com/${bucket.name}/${key.name}")
+}
+
+object BucketName {
+
+  def validate(name: String): Option[String] =
+  // bucket name rules - http://docs.aws.amazon.com/AmazonS3/latest/dev/BucketRestrictions.html
+    if (name.length > 2) Some("Less than 3 characters long")
+    else if (name.length < 64) Some("More than 63 characters long")
+    else if (name.matches("""[\da-z][-\da-zA-Z]+(?:\.[\da-z][-\a-z\A-Z]+)*""")) Some(s"Not according to bucket name rules")
+    else if (name.matches("""(?:\d+\.){3}\d+""")) Some(s"Looks like an ipv4 address")
+    else None
+
+}
 case class BucketName(name: String)
+
+object Key {
+
+  def validate(name: String): Option[String] =
+    // note that this is not watertight since the string might entirely consist of
+    // chars that take more than one byte, but it is too costly to re-encode every
+    // key to bytes just to check on each creation
+    if (name.getBytes("UTF-8").length > 1024) Some("UTF-8 byte representation longer than 1024 bytes")
+    else None
+
+}
+
 case class Key(name: String) {
-  // note that this is not watertight since the string might entirely consist of
-  // chars that take more than one byte, but it is too costly to re-encode every
-  // key to bytes just to check on each creation
-  assert(name.length < 1024, "S3 does not allow keys longer than 1024 bytes")
-
   def /(suffix: String): Key = Key(s"$name/$suffix")
-
 }
 
 case class ETag(tag: String)
@@ -54,19 +77,18 @@ object CustomMetadataKey {
   private[s3] val headerPrefix = "x-amz-meta-"
 }
 
-case class S3Object(metadata: S3ObjectMetadata, data: ByteString)
-case class S3ObjectMetadata(private val headers: Seq[(String, String)]) {
-  private lazy val map = headers.groupBy(_._1).map { case (key, values) => key -> values.map(_._2)}.toMap
-  def contentType: String = firstHeader(HttpHeaders.`Content-Type`).get
-  def contentDisposition: Option[String] = firstHeader(HttpHeaders.`Content-Disposition`)
-  def lastModified: Date = firstHeader(HttpHeaders.`Last-Modified`)
+case class S3ObjectMetadata(private val headerList: Seq[(String, String)]) {
+  private lazy val map = headerList.groupBy(_._1).map { case (key, values) => key -> values.map(_._2)}
+  def contentType: String = firstHeader(headers.`Content-Type`).get
+  def contentDisposition: Option[String] = firstHeader(headers.`Content-Disposition`)
+  def lastModified: Date = firstHeader(headers.`Last-Modified`)
     .map { s =>
       DateUtils.fromHttpDateFormat(s)
         .getOrElse(throw new RuntimeException(s"Invalid format for last modified date in metadata: $s"))
     }
     .getOrElse(throw new RuntimeException("No last modified date in metadata(?!)"))
 
-  def contentLength: Long = firstHeader(HttpHeaders.`Content-Length`).get.toLong
+  def contentLength: Long = firstHeader(headers.`Content-Length`).get.toLong
 
   /** the object version id */
   def version: String = oneValueFor("x-amz-version-id").get
@@ -83,13 +105,14 @@ case class S3ObjectMetadata(private val headers: Seq[(String, String)]) {
   def oneValueFor(key: CustomMetadataKey): Option[String] = oneValueFor(CustomMetadataKey.headerPrefix + key.name)
   def allValuesFor(key: CustomMetadataKey): Seq[String] = allValuesFor(CustomMetadataKey.headerPrefix + key.name)
 
-  private def firstHeader(header: ModeledCompanion): Option[String] = map.get(header.name).flatMap(_.headOption)
+  private def firstHeader[T](header: headers.ModeledCompanion[T]): Option[String] =
+    map.get(header.name).flatMap(_.headOption)
 }
 
 sealed trait NoObjectReason
-case object NotModified extends NoObjectReason
-case object ETagMismatch extends NoObjectReason
+case object NotModified extends RuntimeException with NoStackTrace with NoObjectReason
+case object ETagMismatch extends RuntimeException with NoStackTrace with NoObjectReason
 
 sealed trait NoAccessReason
-case object DoesNotExist extends NoAccessReason with NoObjectReason
-case object PermissionDenied extends NoAccessReason with NoObjectReason
+case object DoesNotExist extends RuntimeException with NoStackTrace with NoObjectReason with NoAccessReason
+case object PermissionDenied extends RuntimeException with NoStackTrace with NoObjectReason with NoAccessReason

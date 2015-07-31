@@ -2,10 +2,11 @@ package awsync.authentication
 
 import java.util.{TimeZone, Calendar}
 
+import akka.http.scaladsl.model._
+import akka.http.scaladsl.model.Uri.Host
+import akka.http.scaladsl.model.headers.RawHeader
 import akka.util.ByteString
 import awsync.{Credentials, Service, Regions, AbstractSpec}
-import spray.http.HttpHeaders.{Host, RawHeader}
-import spray.http._
 
 import scala.collection.immutable.Seq
 
@@ -49,7 +50,7 @@ class SigningSpec extends AbstractSpec {
 
     it("sorts and encodes query headers") {
       val result = encodeHeaders(Seq(
-        Host("www.example.com"),
+        headers.Host("www.example.com"),
         RawHeader("ablab", "agrajag")
       ))
       result should be ("ablab:agrajag\nhost:www.example.com\n")
@@ -71,7 +72,7 @@ class SigningSpec extends AbstractSpec {
           RawHeader("host", "iam.amazonaws.com"),
           RawHeader("x-amz-date", "20110909T233600Z")
         )
-      ).withEntity(HttpEntity(ContentTypes.`text/plain`, HttpData(ByteString("Action=ListUsers&Version=2010-05-08"))))
+      ).withEntity(HttpEntity(ContentTypes.`text/plain`, ByteString("Action=ListUsers&Version=2010-05-08")))
       val (result, signedHeaders) = canonicalRequest(request, "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855")
 
       val expected = """
@@ -123,7 +124,7 @@ class SigningSpec extends AbstractSpec {
           RawHeader("content-type", "application/x-www-form-urlencoded; charset=utf-8"),
           RawHeader("host", "iam.amazonaws.com")
         )
-      ).withEntity(HttpEntity(ContentTypes.`text/plain`, HttpData(ByteString("Action=ListUsers&Version=2010-05-08"))))
+      ).withEntity(HttpEntity(ContentTypes.`text/plain`, ByteString("Action=ListUsers&Version=2010-05-08")))
 
       val cal = Calendar.getInstance(TimeZone.getTimeZone("GMT"))
       cal.set(2011, 8, 9, 23, 36, 0)

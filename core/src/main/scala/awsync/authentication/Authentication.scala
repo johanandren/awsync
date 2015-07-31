@@ -2,11 +2,11 @@ package awsync.authentication
 
 import java.util.Date
 
+import akka.http.scaladsl.model.HttpRequest
+import akka.http.scaladsl.model.headers.RawHeader
 import awsync.http.AwsHeaders
 import awsync.utils.DateUtils
 import awsync.{Credentials, Service, Region}
-import spray.http.HttpHeaders.RawHeader
-import spray.http.HttpRequest
 
 /**
  * AWS signature v4
@@ -24,8 +24,7 @@ object Authentication {
 
   def signWithHeader(request: HttpRequest, region: Region, service: Service, credentials: Credentials, date: Date): HttpRequest = {
 
-    // TODO how do we know that it is chunked?
-    val bodyHash = Sha256.bodyHash(request.entity, chunked = false)
+    val bodyHash = Sha256.bodyHash(request.entity)
 
     val requestWithDate = request.withHeaders(
       request.headers ++ Seq(AwsHeaders.AmzDate(date), RawHeader("x-amz-content-sha256", bodyHash))
