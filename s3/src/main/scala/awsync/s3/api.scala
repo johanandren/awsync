@@ -4,7 +4,7 @@ import java.util.Date
 
 import akka.http.scaladsl.model.ContentType
 import akka.http.scaladsl.model.headers.ByteRange
-import akka.stream.FlowMaterializer
+import akka.stream.Materializer
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
 
@@ -20,7 +20,7 @@ trait HighLevelOperations { this: BucketOperations with ObjectOperations =>
   /** execution context to run all composed operation on top of */
   implicit protected def executionContext: ExecutionContext
   /** materializer to use for stream operations */
-  implicit protected def materializer: FlowMaterializer
+  implicit protected def materializer: Materializer
 
 
   /**

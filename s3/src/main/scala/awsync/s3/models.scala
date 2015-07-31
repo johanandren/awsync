@@ -105,7 +105,8 @@ case class S3ObjectMetadata(private val headerList: Seq[(String, String)]) {
   def oneValueFor(key: CustomMetadataKey): Option[String] = oneValueFor(CustomMetadataKey.headerPrefix + key.name)
   def allValuesFor(key: CustomMetadataKey): Seq[String] = allValuesFor(CustomMetadataKey.headerPrefix + key.name)
 
-  private def firstHeader(header: headers.ModeledCompanion): Option[String] = map.get(header.name).flatMap(_.headOption)
+  private def firstHeader[T](header: headers.ModeledCompanion[T]): Option[String] =
+    map.get(header.name).flatMap(_.headOption)
 }
 
 sealed trait NoObjectReason

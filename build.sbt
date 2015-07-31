@@ -3,7 +3,7 @@ scalacOptions in ThisBuild ++= Seq("-deprecation", "-feature", "-unchecked")
 
 val versions = new {
   val akka = "2.3.7"
-  val akkaStreams = "1.0-RC3"
+  val akkaStreams = "1.0"
   val akkaHttp = akkaStreams
   val scalaTest = "2.2.1"
 }

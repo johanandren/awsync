@@ -3,9 +3,8 @@ package awsync.s3
 import java.util.Date
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.model.headers.ByteRange
-import akka.stream.FlowMaterializer
-import akka.stream.scaladsl.{Sink, Source}
-import org.reactivestreams.Publisher
+import akka.stream.Materializer
+import akka.stream.scaladsl.Source
 
 import scala.collection.immutable.Seq
 import scala.xml.{Elem, XML}
@@ -17,7 +16,7 @@ import awsync.{Regions, Region, Credentials}
 
 private[s3] object ConcreteS3Client {
 
-  def apply(credentials: Credentials, region: Region, https: Boolean = true)(implicit system: ActorSystem, materializer: FlowMaterializer): S3Client =
+  def apply(credentials: Credentials, region: Region, https: Boolean = true)(implicit system: ActorSystem, materializer: Materializer): S3Client =
     new ConcreteS3Client(credentials, region, https)(system, materializer)
 
   private def conditionToHeader(condition: GetObjectCondition): HttpHeader = condition match {
@@ -29,7 +28,7 @@ private[s3] object ConcreteS3Client {
 
   private def path(key: Key): Uri.Path = Uri.Path("/" + key.name)
 
-  private def handleSimpleResponse[A](operation: String)(onOk: Elem => Try[A])(implicit fm: FlowMaterializer, ec: ExecutionContext): HttpResponse => Future[A] = {
+  private def handleSimpleResponse[A](operation: String)(onOk: Elem => Try[A])(implicit fm: Materializer, ec: ExecutionContext): HttpResponse => Future[A] = {
   (response: HttpResponse) =>
     response.entity.dataBytes
       .runFold[ByteString](ByteString())((acc, chunk) => acc ++ chunk)
@@ -52,7 +51,7 @@ private[s3] object ConcreteS3Client {
 private[s3] final class ConcreteS3Client(
     credentials: Credentials, region: Region, val https: Boolean
   )(
-    implicit val system: ActorSystem, val materializer: FlowMaterializer
+    implicit val system: ActorSystem, val materializer: Materializer
   ) extends S3Connections with S3Client {
 
   import HttpMethods._

@@ -3,7 +3,7 @@ package awsync.s3
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.{HttpResponse, HttpRequest, Uri}
 import akka.stream.scaladsl.{Sink, Source}
-import akka.stream.ActorFlowMaterializer
+import akka.stream.ActorMaterializer
 
 import scala.concurrent.duration._
 import akka.actor.ActorSystem
@@ -17,7 +17,7 @@ private[s3] trait S3Connections {
 
   implicit def system: ActorSystem
 
-  private implicit val fm = ActorFlowMaterializer()
+  private implicit val fm = ActorMaterializer()
 
   private def http = Http()
 

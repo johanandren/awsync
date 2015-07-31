@@ -1,7 +1,7 @@
 package awsync.s3
 
-import akka.http.scaladsl.model.{ContentTypes}
-import akka.stream.ActorFlowMaterializer
+import akka.http.scaladsl.model.ContentTypes
+import akka.stream.ActorMaterializer
 
 import scala.collection.immutable.Seq
 import akka.actor.ActorSystem
@@ -29,7 +29,7 @@ class S3Spec extends FunSpec with Matchers with ScalaFutures with BeforeAndAfter
     """.stripMargin))
 
   implicit val ec = system.dispatcher
-  implicit val fm = ActorFlowMaterializer()
+  implicit val fm = ActorMaterializer()
   val client = S3Client(Credentials(s3Key, s3Secret), s3Region)
 
   implicit override val patienceConfig =

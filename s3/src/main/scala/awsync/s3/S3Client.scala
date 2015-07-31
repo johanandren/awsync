@@ -1,7 +1,7 @@
 package awsync.s3
 
 import akka.actor.ActorSystem
-import akka.stream.FlowMaterializer
+import akka.stream.Materializer
 import awsync.{Region, Credentials}
 
 /**
@@ -18,7 +18,7 @@ object S3Client {
   /**
    * @return A thread safe/shareable client to use for communication with amzon s3
    */
-  def apply(credentials: Credentials, region: Region)(implicit system: ActorSystem, materializer: FlowMaterializer): S3Client =
+  def apply(credentials: Credentials, region: Region)(implicit system: ActorSystem, materializer: Materializer): S3Client =
     ConcreteS3Client(credentials, region, https = false)(system, materializer)
 
 }
