@@ -8,6 +8,7 @@ This project provides a core package which makes it easy to talk to amazon
 services asynchronously using Akka HTTP.
 
 ## Using
+**Important** Not quite 100% functional yet!
 Not yet published to maven central. Download and `publishLocal` with sbt for now.
 
 ## Sample usage
