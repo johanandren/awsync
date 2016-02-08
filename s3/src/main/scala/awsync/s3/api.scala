@@ -65,8 +65,7 @@ trait ObjectOperations {
   /**
    * Create a new object under the given key, with data that is available in memory, as a single request
    */
-  def createObject(key: FqKey, contentType: ContentType, data: ByteString, config: CreateObjectConfig): Future[Done] =
-    createObject(key, contentType, Source.single(data), data.length, config)
+  def createObject(key: FqKey, contentType: ContentType, data: ByteString, config: CreateObjectConfig): Future[Done]
 
   /**
    * @return None if there is no such object, the metadata of the object at key if there is.

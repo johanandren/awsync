@@ -10,7 +10,7 @@ import akka.http.scaladsl.model.headers.{RawHeader, HttpEncoding, ByteRange}
 import akka.stream.Materializer
 import akka.stream.scaladsl.Source
 import akka.stream.stage.{SyncDirective, Context, PushPullStage}
-import awsync.authentication.{Signature, StringToSign, Sha256, CanonicalRequest}
+import awsync.authentication._
 import awsync.http.AwsHeaders
 import awsync.utils.DateUtils
 
@@ -21,6 +21,7 @@ import scala.util.Try
 import akka.actor.ActorSystem
 import akka.util.ByteString
 import awsync.{Regions, Region, Credentials}
+import scala.concurrent.duration._
 
 private[s3] object ConcreteS3Client {
 
@@ -143,7 +144,44 @@ private[s3] final class ConcreteS3Client(
 
 
 
+  override def createObject(key: FqKey, contentType: ContentType, data: ByteString, config: CreateObjectConfig): Future[Done] = {
+    val uri = bucketBaseUri(key.bucket).withPath(path(key.key))
+
+    val date = new Date
+    val headerList: List[HttpHeader] =
+      List(
+        Some[HttpHeader](headers.Host(uri.authority.host.address)),
+        config.cacheControl.map(headers.`Cache-Control`(_)),
+        /* config.cannedAcl.fold(
+           canned -> None //Some(RawHeader("x-amz-acl" -> canned.name)),
+           permissions -> None
+         */
+        config.contentDisposition.map(headers.`Content-Disposition`(_)),
+        Some(headers.RawHeader("x-amz-storage-class", config.storageClass.name))
+      ).flatten ++ config.customMetadata.map(t => headers.RawHeader(t._1.name, t._2))
+
+
+    val request = HttpRequest(PUT, uri,
+      headerList,
+      HttpEntity.Strict(contentType, data)
+    )
+
+    val signedRequest = Authentication.signWithHeader(request, region, service, credentials)
+    sendBucketRequest(key.bucket, signedRequest).flatMap { response =>
+      response.status match {
+        case StatusCodes.OK => Future.successful(Done)
+        case error =>
+
+          response.entity.toStrict(200.millis).map(data => throw new RuntimeException(s"unexpected response $error: $data"))
+
+      }
+
+    }
+  }
+
   override def createObject(key: FqKey, contentType: ContentType, data: Source[ByteString, NotUsed], dataLength: Long, config: CreateObjectConfig): Future[Done] = {
+    ???
+    /*
     val uri = bucketBaseUri(key.bucket).withPath(path(key.key))
 
     val date = new Date
@@ -211,7 +249,7 @@ private[s3] final class ConcreteS3Client(
       println(response)
       response.entity.dataBytes.runForeach(bs => println(bs.utf8String))
     }
-
+  */
   }
 
   override def deleteObject(key: FqKey): Future[Done] = {
