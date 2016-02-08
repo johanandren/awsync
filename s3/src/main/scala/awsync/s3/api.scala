@@ -2,6 +2,7 @@ package awsync.s3
 
 import java.util.Date
 
+import akka.{Done, NotUsed}
 import akka.http.scaladsl.model.ContentType
 import akka.http.scaladsl.model.headers.ByteRange
 import akka.stream.Materializer
@@ -57,14 +58,15 @@ trait HighLevelOperations { this: BucketOperations with ObjectOperations =>
 trait ObjectOperations {
 
   /**
-   * Create a new object under the given key, with data that is available in memory, as a single request
-   */
-  def createObject(key: FqKey, contentType: ContentType, data: ByteString, config: CreateObjectConfig = CreateObjectConfig.default): Future[Unit]
-
-  /**
    * Create a new object by streaming data in chunks, performing multiple requests
    */
-  def createObjectFromStream(key: FqKey, contentType: ContentType, data: Source[ByteString, Unit], config: CreateObjectConfig): Future[Unit]
+  def createObject(key: FqKey, contentType: ContentType, data: Source[ByteString, NotUsed], dataLength: Long, config: CreateObjectConfig): Future[Done]
+
+  /**
+   * Create a new object under the given key, with data that is available in memory, as a single request
+   */
+  def createObject(key: FqKey, contentType: ContentType, data: ByteString, config: CreateObjectConfig): Future[Done] =
+    createObject(key, contentType, Source.single(data), data.length, config)
 
   /**
    * @return None if there is no such object, the metadata of the object at key if there is.
@@ -75,13 +77,13 @@ trait ObjectOperations {
    * @return A future that completes with the metadata and then the stream of bytes for the object or fails with details
    *         about why (not such key, for example)
    */
-  def getObjectStream(key: FqKey, range: Option[ByteRange] = None, conditions: Option[GetObjectCondition] = None): Future[(S3ObjectMetadata, Source[ByteString, Unit])]
+  def getObjectStream(key: FqKey, range: Option[ByteRange] = None, conditions: Option[GetObjectCondition] = None): Future[(S3ObjectMetadata, Source[ByteString, NotUsed])]
 
   /** Delete the object at the given key */
-  def deleteObject(fqKey: FqKey): Future[Unit]
+  def deleteObject(fqKey: FqKey): Future[Done]
 
   /** Delete multiple objects with one request (max 1000 keys - TODO split more over many requests or return error?) */
-  def deleteObjects(bucket: BucketName, keys: Seq[Key]): Future[Unit]
+  def deleteObjects(bucket: BucketName, keys: Seq[Key]): Future[Done]
 }
 
 trait BucketOperations {
@@ -100,7 +102,7 @@ trait BucketOperations {
    *
    * @param config Details about how to filter/search the listing
    */
-  def listObjectStream(bucket: BucketName, config: ListObjectsConfig): Future[(ListObjectsInfo, Source[Seq[KeyDetails], Unit])]
+  def listObjectStream(bucket: BucketName, config: ListObjectsConfig): Future[(ListObjectsInfo, Source[Seq[KeyDetails], NotUsed])]
   protected implicit def executionContext: ExecutionContext
 
 //  /**

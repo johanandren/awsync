@@ -1,9 +1,14 @@
 package awsync.authentication
 
 import java.util.Date
+import java.util.concurrent.atomic.AtomicReference
 
-import akka.http.scaladsl.model.HttpRequest
-import akka.http.scaladsl.model.headers.RawHeader
+import akka.http.javadsl.model.headers.ContentEncoding
+import akka.http.scaladsl.model.{HttpEntity, TransferEncodings, HttpRequest}
+import akka.http.scaladsl.model.headers.{`Transfer-Encoding`, HttpEncoding, RawHeader}
+import akka.stream.scaladsl.{Source, Flow}
+import akka.stream.stage.{SyncDirective, Context, PushPullStage}
+import akka.util.ByteString
 import awsync.http.AwsHeaders
 import awsync.utils.DateUtils
 import awsync.{Credentials, Service, Region}
@@ -44,5 +49,6 @@ object Authentication {
 
     requestWithDate.withHeaders(requestWithDate.headers :+ RawHeader("Authorization", authHeader))
   }
+
 
 }

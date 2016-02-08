@@ -7,7 +7,7 @@ import javax.crypto.spec.SecretKeySpec
 import awsync.utils.{Hex, DateUtils}
 import awsync.{Service, Region, AwsSecret}
 
-private[authentication] object Signature {
+private[awsync] object Signature {
 
   import Sha256.hmacSHA256
 

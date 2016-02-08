@@ -1,18 +1,16 @@
-scalaVersion in ThisBuild := "2.11.6"
+scalaVersion in ThisBuild := "2.11.7"
 scalacOptions in ThisBuild ++= Seq("-deprecation", "-feature", "-unchecked")
 
-val versions = new {
-  val akka = "2.3.7"
-  val akkaStreams = "1.0"
-  val akkaHttp = akkaStreams
+lazy val versions = new {
+  val akkaV = "2.4.2-RC2"
   val scalaTest = "2.2.1"
 }
 
 lazy val akkaDeps = Seq(
-  "com.typesafe.akka" %% "akka-actor" % versions.akka,
-  "com.typesafe.akka" %% "akka-http-core-experimental" % versions.akkaHttp,
-  "com.typesafe.akka" %% "akka-http-experimental" % versions.akkaHttp,
-  "com.typesafe.akka" %% "akka-stream-experimental" % versions.akkaStreams
+  "com.typesafe.akka" %% "akka-actor" % versions.akkaV,
+  "com.typesafe.akka" %% "akka-stream" % versions.akkaV,
+  "com.typesafe.akka" %% "akka-http-core" % versions.akkaV,
+  "com.typesafe.akka" %% "akka-http-experimental" % versions.akkaV
 )
 
 lazy val core = project

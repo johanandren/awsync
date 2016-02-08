@@ -1,7 +1,9 @@
 package awsync.s3
 
+import akka.NotUsed
 import akka.http.scaladsl.model.ContentTypes
 import akka.stream.ActorMaterializer
+import akka.stream.scaladsl.Source
 
 import scala.collection.immutable.Seq
 import akka.actor.ActorSystem
@@ -11,6 +13,8 @@ import com.typesafe.config.ConfigFactory
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.time.{Millis, Seconds, Span}
 import org.scalatest.{BeforeAndAfterAll, Matchers, FunSpec}
+import scala.concurrent.duration._
+import scala.concurrent.Await
 
 class S3Spec extends FunSpec with Matchers with ScalaFutures with BeforeAndAfterAll {
 
@@ -22,7 +26,7 @@ class S3Spec extends FunSpec with Matchers with ScalaFutures with BeforeAndAfter
   val s3Region = Regions.fromName(config.getString("s3.region")).get
   val bucket = BucketName(config.getString("s3.bucket"))
 
-  implicit val system = ActorSystem("it", ConfigFactory.parseString(
+  implicit val system: ActorSystem = ActorSystem("it", ConfigFactory.parseString(
     """
       |akka.log-dead-letters-during-shutdown: false
       |akka.log-dead-letters: 1
@@ -71,6 +75,23 @@ class S3Spec extends FunSpec with Matchers with ScalaFutures with BeforeAndAfter
       result.futureValue shouldEqual data
     }
 
+    it("creates, fetches and deletes an object with streaming data") {
+      val key = Key("it-test-object-stream")
+      val loc = FqKey(bucket, key)
+      val data: ByteString = ByteString(Array.tabulate(100)(n => n.toByte))
+      val source: Source[ByteString, NotUsed] = Source.fromIterator(() => data.grouped(10))
+
+      val result =
+        for {
+          _ <- client.createObject(loc, ContentTypes.`application/octet-stream`, source, data.length, CreateObjectConfig.default)
+          (metadata, objectStream) <- client.getObjectStream(loc)
+          readData <- objectStream.runFold(ByteString())((acc, chunk) => acc ++ chunk)
+          _ <- client.deleteObject(loc)
+        } yield readData
+
+      result.futureValue shouldEqual data
+    }
+
     it("returns DoesNotExist when trying to fetch a non-existant key") {
       val key = Key("does-not-exist")
       val loc = FqKey(bucket, key)
@@ -87,8 +108,8 @@ class S3Spec extends FunSpec with Matchers with ScalaFutures with BeforeAndAfter
 
       val result =
         for {
-          _ <- client.createObject(FqKey(bucket, key1), ContentTypes.`application/octet-stream`, data)
-          _ <- client.createObject(FqKey(bucket, key2), ContentTypes.`application/octet-stream`, data)
+          _ <- client.createObject(FqKey(bucket, key1), ContentTypes.`application/octet-stream`, data, CreateObjectConfig.default)
+          _ <- client.createObject(FqKey(bucket, key2), ContentTypes.`application/octet-stream`, data, CreateObjectConfig.default)
           _ <- client.deleteObjects(bucket, Seq(key1, key2))
           items <- client.listObjects(bucket)
         } yield items
@@ -99,6 +120,6 @@ class S3Spec extends FunSpec with Matchers with ScalaFutures with BeforeAndAfter
   }
 
   override protected def afterAll(): Unit = {
-    system.shutdown()
+    Await.result(system.terminate(), 20.seconds)
   }
 }

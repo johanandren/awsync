@@ -4,19 +4,29 @@ import akka.http.scaladsl.model.{HttpHeader, Uri, HttpRequest}
 import awsync.utils.Hex
 import collection.immutable.Seq
 
-private[authentication] object CanonicalRequest {
+private[awsync] object CanonicalRequest {
 
   type CanonicalRequest = String
   type SignedHeaders = String
 
-  def canonicalRequest(request: HttpRequest, bodyHash: String): (String, String) = {
+  def canonicalRequest(request: HttpRequest, bodyHash: String): (CanonicalRequest, SignedHeaders) = {
     val method = request.method.name
     val canonicalUri = encodePath(request.uri.path)
-    val canonicalQuery = encodeParameters(request.uri.query)
+    val canonicalQuery = encodeParameters(request.uri.query())
     val canonicalHeaders = encodeHeaders(request.headers)
     val signedHeaders = encodeSignedHeaders(request.headers)
 
     (s"$method\n$canonicalUri\n$canonicalQuery\n$canonicalHeaders\n$signedHeaders\n$bodyHash", signedHeaders)
+  }
+
+  def canonicalChunkedRequest(request: HttpRequest): (CanonicalRequest, SignedHeaders) = {
+    val method = request.method.name
+    val canonicalUri = encodePath(request.uri.path)
+    val canonicalQuery = encodeParameters(request.uri.query())
+    val canonicalHeaders = encodeHeaders(request.headers)
+    val signedHeaders = encodeSignedHeaders(request.headers)
+
+    (s"$method\n$canonicalUri\n$canonicalQuery\n$canonicalHeaders\n$signedHeaders", signedHeaders)
   }
 
 

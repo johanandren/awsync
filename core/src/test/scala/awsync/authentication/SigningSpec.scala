@@ -72,7 +72,7 @@ class SigningSpec extends AbstractSpec {
           RawHeader("host", "iam.amazonaws.com"),
           RawHeader("x-amz-date", "20110909T233600Z")
         )
-      ).withEntity(HttpEntity(ContentTypes.`text/plain`, ByteString("Action=ListUsers&Version=2010-05-08")))
+      ).withEntity(HttpEntity(ContentTypes.`text/plain(UTF-8)`, ByteString("Action=ListUsers&Version=2010-05-08")))
       val (result, signedHeaders) = canonicalRequest(request, "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855")
 
       val expected = """
@@ -124,7 +124,7 @@ class SigningSpec extends AbstractSpec {
           RawHeader("content-type", "application/x-www-form-urlencoded; charset=utf-8"),
           RawHeader("host", "iam.amazonaws.com")
         )
-      ).withEntity(HttpEntity(ContentTypes.`text/plain`, ByteString("Action=ListUsers&Version=2010-05-08")))
+      ).withEntity(HttpEntity(ContentTypes.`text/plain(UTF-8)`, ByteString("Action=ListUsers&Version=2010-05-08")))
 
       val cal = Calendar.getInstance(TimeZone.getTimeZone("GMT"))
       cal.set(2011, 8, 9, 23, 36, 0)

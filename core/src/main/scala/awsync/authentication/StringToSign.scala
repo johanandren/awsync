@@ -2,7 +2,7 @@ package awsync.authentication
 
 import awsync.{Service, Region}
 
-private[authentication] object StringToSign {
+private[awsync] object StringToSign {
 
   private val algorithm = "AWS4-HMAC-SHA256"
 

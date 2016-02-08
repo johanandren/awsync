@@ -8,7 +8,7 @@ import akka.http.scaladsl.model.HttpEntity
 import akka.util.ByteString
 import awsync.utils.Hex
 
-private[authentication] object Sha256 {
+private[awsync] object Sha256 {
 
   // not thread safe so must be created for each calculation
   private def sha256 = MessageDigest.getInstance("SHA-256")

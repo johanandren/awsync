@@ -7,7 +7,7 @@ import awsync.authentication.Authentication
 
 private[s3] object RequestUtils {
 
-  private val service = Service("s3")
+  val service = Service("s3")
   
   def signedRequest(method: HttpMethod, uri: Uri, body: RequestEntity, region: Region, credentials: Credentials): HttpRequest =
     signedRequest(HttpRequest(method, uri, List(headers.Host(uri.authority.host.address)), body), region, credentials)
